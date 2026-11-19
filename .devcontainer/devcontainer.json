@@ -1,0 +1,25 @@
+{
+  "name": "Memorama PvP",
+  "dockerComposeFile": ["../docker-compose.yml", "docker-compose.devcontainer.yml"],
+  "service": "web",
+  "workspaceFolder": "/workspace",
+  "runServices": ["web", "db"],
+  "shutdownAction": "stopCompose",
+  "remoteUser": "app",
+  "forwardPorts": [8000],
+  "postCreateCommand": "pip install --user -r requirements-dev.txt",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.flake8",
+        "wholroyd.jinja",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"]
+      }
+    }
+  }
+}

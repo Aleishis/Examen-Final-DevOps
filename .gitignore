@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+instance/
+*.db
+
+# Pruebas
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secretos
+.env
+
+# Archivos subidos por usuarios
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Editores / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,10 @@
+# Ajustes sobre docker-compose.yml solo para el Dev Container:
+# monta el repo en /workspace y deja el contenedor vivo para trabajar dentro.
+# Para levantar la app desde la terminal del contenedor: python main.py
+# Ojo: las rutas relativas se resuelven desde la raíz del repo (carpeta del primer compose).
+services:
+  web:
+    command: sleep infinity
+    working_dir: /workspace
+    volumes:
+      - .:/workspace:cached

@@ -1,0 +1,19 @@
+#cloud-config
+# Se pega en Azure > Crear VM > Avanzado > "Datos personalizados" (Custom data).
+# Prepara la VM en el primer arranque: Docker, carpeta de la app y swap.
+# Supone que el usuario administrador de la VM se llama "azureuser".
+
+package_update: true
+package_upgrade: true
+
+# La VM (B2pts_v2) tiene 1 GB de RAM; el swap evita que MySQL se quede sin memoria.
+swap:
+  filename: /swapfile
+  size: 2G
+
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - usermod -aG docker azureuser
+  - systemctl enable --now docker
+  - mkdir -p /home/azureuser/memorama
+  - chown azureuser:azureuser /home/azureuser/memorama

@@ -1,0 +1,121 @@
+# Despliegue continuo a la VM de Azure.
+# Solo despliega si las pruebas (ci.yml) pasan: tests -> build/push a GHCR -> deploy por SSH -> health check.
+#
+# Configuración del environment "production" (Settings > Environments):
+#   Variable VM_HOST   IP pública o DNS de la VM
+#   Secret VM_USER     usuario SSH de la VM (ej. azureuser)
+#   Secret VM_SSH_KEY  llave privada SSH con acceso a la VM
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/aleishis/examen-final-devops
+  APP_DIR: memorama
+
+jobs:
+  tests:
+    name: Pruebas
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build y push a GHCR
+    needs: tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # La VM es ARM (Standard_B2pts_v2); QEMU permite construir arm64 en el runner x64.
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y publicar imagen
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Desplegar en VM
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: http://${{ vars.VM_HOST }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Copiar docker-compose.prod.yml a la VM
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: docker-compose.prod.yml
+          target: ${{ env.APP_DIR }}  # relativo al home del usuario SSH
+
+      - name: Levantar la nueva versión
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          APP_DIR: ${{ env.APP_DIR }}
+          IMAGE_TAG: ${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ vars.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          envs: APP_DIR,IMAGE_TAG,GHCR_USER,GHCR_TOKEN
+          script: |
+            set -e
+            cd ~/"$APP_DIR"
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            # Guarda la versión que estaba corriendo (base para el rollback).
+            if [ -f .current_tag ]; then cp .current_tag .previous_tag; fi
+            export IMAGE_TAG
+            docker compose -f docker-compose.prod.yml pull web
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            echo "$IMAGE_TAG" > .current_tag
+            docker logout ghcr.io
+            docker image prune -f
+
+      - name: Health check
+        env:
+          VM_HOST: ${{ vars.VM_HOST }}
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS "http://$VM_HOST/health"; then
+              echo; echo "La aplicación respondió correctamente."
+              exit 0
+            fi
+            echo "Intento $i: aún no responde, reintentando en 6s..."
+            sleep 6
+          done
+          echo "La aplicación no pasó el health check."
+          exit 1

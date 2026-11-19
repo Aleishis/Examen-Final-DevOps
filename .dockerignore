@@ -1,0 +1,15 @@
+.git
+.github
+.devcontainer
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+htmlcov
+instance
+.env
+static/uploads/*
+!static/uploads/.gitkeep
+tests
