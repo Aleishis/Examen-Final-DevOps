@@ -26,6 +26,9 @@ app.config.update(
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+import models  # noqa: F401
+
 # Un solo proceso (gunicorn -w 1): las salas de Socket.IO viven en memoria.
 socketio = SocketIO(app)
 
