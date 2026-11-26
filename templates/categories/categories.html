@@ -8,8 +8,6 @@
     <style>
         @import url("{{ url_for('static', filename='css/categories.css') }}");
     </style>
-
-    <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
 </head>
 
 <body>
@@ -97,7 +95,13 @@
     {% if categorias %}
         <div class="rejilla">
             {% for categoria in categorias %}
-                <article class="tarjeta">
+                <article
+                    class="tarjeta tarjeta-clicable"
+                    data-url="{{ url_for('categorias.detalle', categoria_id=categoria.id) }}"
+                    tabindex="0"
+                    role="link"
+                    aria-label="Ver detalles de {{ categoria.nombre }}"
+                >
                     <div class="tarjeta-superior">
                         <label>
                             <input
@@ -140,14 +144,6 @@
                                 Difícil
                             </span>
                         </div>
-
-                        <div class="pie-tarjeta">
-                            <span>
-                                {{ 'Fácil disponible' if categoria.dificultades.facil else 'Aún sin dificultades' }}
-                            </span>
-
-                            <a href="#">Editar</a>
-                        </div>
                     </div>
                 </article>
             {% endfor %}
@@ -160,6 +156,6 @@
     {% endif %}
 
 </div>
-
+<script src="{{ url_for('static', filename='js/categories.js') }}" defer></script>
 </body>
 </html>

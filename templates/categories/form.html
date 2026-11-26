@@ -1,0 +1,127 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ categoria.nombre }} | Memorama</title>
+
+    <style>
+        @import url("{{ url_for('static', filename='css/categories.css') }}");
+    </style>
+</head>
+
+<body>
+<div class="contenedor">
+
+    <a
+        class="boton boton-volver"
+        href="{{ url_for('categorias.listar') }}"
+    >
+        ← Volver a categorías
+    </a>
+
+    <div class="encabezado">
+        <div>
+            <h1>Detalles de la categoría</h1>
+            <p>Consulta la información y las parejas de cartas.</p>
+        </div>
+    </div>
+
+    <section class="detalle-resumen">
+
+        {% if portada %}
+            <img
+                class="detalle-portada"
+                src="{{ url_for('static', filename=portada.imagen) }}"
+                alt="Portada de {{ categoria.nombre }}"
+            >
+        {% else %}
+            <div class="sin-portada detalle-portada">
+                Sin portada
+            </div>
+        {% endif %}
+
+        <div class="detalle-info">
+            <h1>{{ categoria.nombre }}</h1>
+
+            <p>
+                <strong>Estado:</strong>
+                <span class="estado-detalle {{ 'activa' if categoria.activa else 'inactiva' }}">
+                    {{ 'Activa' if categoria.activa else 'Inactiva' }}
+                </span>
+            </p>
+
+            <p>
+                <strong>Parejas registradas:</strong>
+                {{ cantidad_parejas }} / 50
+            </p>
+
+            <h3>Dificultades disponibles</h3>
+
+            <div class="dificultades">
+                <span class="dificultad {{ '' if dificultades.facil else 'bloqueada' }}">
+                    Fácil
+                </span>
+
+                <span class="dificultad {{ '' if dificultades.media else 'bloqueada' }}">
+                    Medio
+                </span>
+
+                <span class="dificultad {{ '' if dificultades.dificil else 'bloqueada' }}">
+                    Difícil
+                </span>
+            </div>
+
+            <div class="detalle-acciones">
+                <button
+                    type="button"
+                    class="editar-pendiente"
+                    disabled
+                    title="La edición se implementará posteriormente"
+                >
+                    Editar categoría (próximamente)
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Parejas de cartas</h2>
+        <p>
+            Estas son las {{ cantidad_parejas }} parejas registradas
+            en esta categoría.
+        </p>
+
+        {% if parejas %}
+            <div class="parejas-rejilla">
+                {% for pareja in parejas %}
+                    <article class="pareja-tarjeta">
+
+                        <img
+                            class="pareja-imagen"
+                            src="{{ url_for('static', filename=pareja.imagen) }}"
+                            alt="{{ pareja.nombre }}"
+                            loading="lazy"
+                        >
+
+                        <h3>{{ pareja.nombre }}</h3>
+
+                        {% if portada and pareja.id == portada.id %}
+                            <p><strong>Portada de la categoría</strong></p>
+                        {% endif %}
+
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="parejas-vacias">
+                <h3>Esta categoría aún no tiene parejas</h3>
+                <p>Cuando agregues cartas, aparecerán aquí.</p>
+            </div>
+        {% endif %}
+    </section>
+
+</div>
+</body>
+</html>

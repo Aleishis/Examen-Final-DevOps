@@ -103,3 +103,44 @@ def listar():
             "orden": orden,
         },
     )
+
+
+
+@categorias_bp.route("/<int:categoria_id>")
+def detalle(categoria_id):
+    # Buscar la categoría o devolver un error 404 si no existe.
+    categoria = db.get_or_404(Categoria, categoria_id)
+
+    # Obtener todas las parejas de cartas de la categoría.
+    parejas = (
+        ParejaCarta.query
+        .filter_by(categoria_id=categoria.id)
+        .order_by(ParejaCarta.nombre.asc())
+        .all()
+    )
+
+    cantidad_parejas = len(parejas)
+
+    # Buscar la portada únicamente entre las parejas de esta categoría.
+    portada = next(
+        (
+            pareja for pareja in parejas
+            if pareja.id == categoria.portada_id
+        ),
+        None,
+    )
+
+    dificultades = {
+        "facil": cantidad_parejas >= 9,
+        "media": cantidad_parejas >= 15,
+        "dificil": cantidad_parejas >= 25,
+    }
+
+    return render_template(
+        "categories/form.html",
+        categoria=categoria,
+        parejas=parejas,
+        portada=portada,
+        cantidad_parejas=cantidad_parejas,
+        dificultades=dificultades,
+    )
