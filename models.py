@@ -32,6 +32,16 @@ class Categoria(db.Model):
         nullable=False,
         server_default=text("1"),
     )
+    portada_id = db.Column(
+    db.Integer,
+    ForeignKey(
+        "parejas_cartas.id",
+        name="fk_categorias_portada",
+        ondelete="SET NULL",
+        onupdate="CASCADE",
+    ),
+    nullable=True,
+    )
 
 
 class ParejaCarta(db.Model):
