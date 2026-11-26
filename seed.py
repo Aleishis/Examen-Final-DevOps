@@ -8,7 +8,7 @@ from models import Categoria, ParejaCarta, Sala, Usuario
 
 # Datos iniciales del juego
 CATEGORIAS = {
-    "creepypastas": [
+    "Creepypastas": [
         ("Ben Drowned", "images/creepypastas/Ben Drowned.png"),
         ("Bloody Painter", "images/creepypastas/Bloody Painter.png"),
         ("clockwork", "images/creepypastas/clockwork.png"),
@@ -180,6 +180,35 @@ def seed_database():
                         )
 
             # Guardar categorías y parejas antes de crear salas
+            db.session.flush()
+
+
+            # 2.5 Asignar portadas mediante el ID de una pareja
+            PORTADAS = {
+                "Creepypastas": 15,
+                "Frutas": 37,
+                "Dragon Ball": 57,
+                "Paw Patrol": 69,
+                "Sanrio": 83,
+                "Vocaloid": 103,
+            }
+
+            for nombre_categoria, pareja_id in PORTADAS.items():
+                categoria = categorias_db[nombre_categoria]
+
+                pareja = ParejaCarta.query.filter_by(
+                    id=pareja_id,
+                    categoria_id=categoria.id,
+                ).first()
+
+                if pareja is None:
+                    raise ValueError(
+                        f"La pareja con ID {pareja_id} no existe "
+                        f"o no pertenece a la categoría {nombre_categoria}"
+                    )
+
+                categoria.portada_id = pareja.id
+
             db.session.flush()
 
             # 3. Crear las salas con los nombres definidos en SALAS
