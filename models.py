@@ -77,6 +77,11 @@ class Sala(db.Model):
         ),
         nullable=False,
     )
+    dificultad = db.Column(
+    Enum("facil", "media", "dificil", name="dificultad_sala"),
+    nullable=False,
+    server_default=text("'facil'")
+    )
     estado = db.Column(
         Enum(
             "disponible",
