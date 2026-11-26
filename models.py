@@ -1,4 +1,3 @@
-
 from sqlalchemy import CheckConstraint, Enum, ForeignKey, text
 
 from main import db
@@ -113,6 +112,10 @@ class Partida(db.Model):
             onupdate="CASCADE",
         ),
         nullable=False,
+    )
+    dificultad = db.Column(
+    Enum("facil", "media", "dificil", name="dificultad_partida"),
+    nullable=False,
     )
     jugador1_id = db.Column(
         db.Integer,
