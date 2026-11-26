@@ -4,13 +4,13 @@
 def obtener_dificultades(cantidad_pares):
     dificultades = []
 
-    if cantidad_pares >= 3:
+    if cantidad_pares >= 9:
         dificultades.append("facil")
 
-    if cantidad_pares >= 6:
+    if cantidad_pares >= 15:
         dificultades.append("media")
 
-    if cantidad_pares >= 10:
+    if cantidad_pares >= 25:
         dificultades.append("dificil")
 
     return dificultades
