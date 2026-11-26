@@ -1,6 +1,5 @@
 from sqlalchemy import CheckConstraint, Enum, ForeignKey, text
-
-from main import db
+from extensions import db
 
 
 class Usuario(db.Model):

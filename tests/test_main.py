@@ -1,4 +1,4 @@
-from main import db
+from extensions import db
 
 
 def test_index_responde_200(client):

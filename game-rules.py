@@ -17,7 +17,7 @@ def obtener_dificultades(cantidad_pares):
 
 # Función para obtener la cantidad de parejas de una categoría
 def contar_parejas_categoria(categoria_id):
-    from main import db
+    from extensions import db
     from models import ParejaCarta
 
     return db.session.query(ParejaCarta).filter_by(

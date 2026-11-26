@@ -8,7 +8,8 @@ os.environ["SECRET_KEY"] = "pruebas"
 import pytest  # noqa: E402
 
 from main import app as flask_app  # noqa: E402
-from main import db, socketio  # noqa: E402
+from main import socketio  # noqa: E402
+from extensions import db
 
 
 @pytest.fixture

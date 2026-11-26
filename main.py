@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template
 from flask_migrate import Migrate
 from flask_socketio import SocketIO
-from flask_sqlalchemy import SQLAlchemy
+from extensions import db
 from sqlalchemy import text
 
 load_dotenv()
@@ -24,7 +24,7 @@ app.config.update(
     MAX_CONTENT_LENGTH=5 * 1024 * 1024,  # 5 MB por imagen subida
 )
 
-db = SQLAlchemy(app)
+db.init_app(app)
 migrate = Migrate(app, db)
 
 import models  # noqa: F401
