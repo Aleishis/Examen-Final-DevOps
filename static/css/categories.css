@@ -1,0 +1,172 @@
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: Arial, sans-serif;
+            background: #f5f6fa;
+            color: #252538;
+        }
+
+        .contenedor {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .encabezado,
+        .acciones,
+        .filtros,
+        .tarjeta-superior,
+        .pie-tarjeta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .filtros {
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            margin: 25px 0;
+            padding: 18px;
+            background: white;
+            border-radius: 12px;
+        }
+
+        input, select, button, .boton {
+            padding: 10px 12px;
+            border: 1px solid #d9d9e3;
+            border-radius: 7px;
+            font-size: 14px;
+        }
+
+        input[type="text"] {
+            min-width: 220px;
+        }
+
+        button, .boton {
+            cursor: pointer;
+            text-decoration: none;
+            color: #252538;
+            background: white;
+        }
+
+        .boton-agregar {
+            color: white;
+            background: #218838;
+            border-color: #218838;
+        }
+
+        .boton-eliminar {
+            color: white;
+            background: #d9363e;
+            border-color: #d9363e;
+        }
+
+        .rejilla {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .tarjeta {
+            background: white;
+            border: 1px solid #e2e3eb;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .tarjeta-superior {
+            padding: 14px;
+        }
+
+        .portada {
+            width: 100%;
+            height: 175px;
+            object-fit: contain;
+            background: #ececf2;
+        }
+
+        .sin-portada {
+            height: 175px;
+            display: grid;
+            place-items: center;
+            color: #777;
+            background: #ececf2;
+        }
+
+        .contenido {
+            padding: 16px;
+        }
+
+        .contenido h2 {
+            margin: 0 0 10px;
+            font-size: 19px;
+            overflow-wrap: anywhere;
+        }
+
+        .estado {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .activa {
+            color: #176b35;
+            background: #d9f5e2;
+        }
+
+        .inactiva {
+            color: #555;
+            background: #e8e8ed;
+        }
+
+        .dificultades {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-top: 15px;
+        }
+
+        .dificultad {
+            padding: 6px 9px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: #e6f5e9;
+            color: #176b35;
+        }
+
+        .dificultad.bloqueada {
+            background: #ededf0;
+            color: #888;
+        }
+
+        .pie-tarjeta {
+            margin-top: 18px;
+        }
+
+        .vacio {
+            padding: 40px;
+            text-align: center;
+            background: white;
+            border-radius: 12px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 15px;
+            }
+
+            .encabezado {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            input[type="text"] {
+                min-width: 0;
+                width: 100%;
+            }
+        }

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Categorías | Memorama</title>
+
+    <style>
+        @import url("{{ url_for('static', filename='css/categories.css') }}");
+    </style>
+
+    <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
+</head>
+
+<body>
+<div class="contenedor">
+
+    <div class="encabezado">
+        <div>
+            <h1>Categorías</h1>
+            <p>Administra las categorías y sus parejas de cartas.</p>
+        </div>
+
+        <a class="boton boton-agregar" href="#">
+            + Agregar nueva categoría
+        </a>
+    </div>
+
+    <form method="GET" action="{{ url_for('categorias.listar') }}">
+        <div class="filtros">
+            <input
+                type="text"
+                name="q"
+                placeholder="Insertar nombre"
+                value="{{ filtros.q }}"
+            >
+
+            <select name="cantidad">
+                <option value="todas" {% if filtros.cantidad == 'todas' %}selected{% endif %}>
+                    Todas las cantidades
+                </option>
+                <option value="menos_9" {% if filtros.cantidad == 'menos_9' %}selected{% endif %}>
+                    Menos de 9 parejas
+                </option>
+                <option value="9_14" {% if filtros.cantidad == '9_14' %}selected{% endif %}>
+                    9–14 parejas
+                </option>
+                <option value="15_24" {% if filtros.cantidad == '15_24' %}selected{% endif %}>
+                    15–24 parejas
+                </option>
+                <option value="25_mas" {% if filtros.cantidad == '25_mas' %}selected{% endif %}>
+                    25 parejas o más
+                </option>
+            </select>
+
+            <select name="orden">
+                <option value="nombre_asc" {% if filtros.orden == 'nombre_asc' %}selected{% endif %}>
+                    Nombre: A–Z
+                </option>
+                <option value="nombre_desc" {% if filtros.orden == 'nombre_desc' %}selected{% endif %}>
+                    Nombre: Z–A
+                </option>
+                <option value="parejas_asc" {% if filtros.orden == 'parejas_asc' %}selected{% endif %}>
+                    Menos parejas primero
+                </option>
+                <option value="parejas_desc" {% if filtros.orden == 'parejas_desc' %}selected{% endif %}>
+                    Más parejas primero
+                </option>
+            </select>
+
+            <select name="estado">
+                <option value="todas" {% if filtros.estado == 'todas' %}selected{% endif %}>
+                    Todos los estados
+                </option>
+                <option value="activas" {% if filtros.estado == 'activas' %}selected{% endif %}>
+                    Activas
+                </option>
+                <option value="inactivas" {% if filtros.estado == 'inactivas' %}selected{% endif %}>
+                    Inactivas
+                </option>
+            </select>
+
+            <button type="submit">Aplicar filtros</button>
+            <a class="boton" href="{{ url_for('categorias.listar') }}">
+                Limpiar
+            </a>
+        </div>
+    </form>
+
+    <div class="acciones" style="margin-bottom: 18px;">
+        <span>Selecciona las categorías que quieras administrar.</span>
+        <button class="boton-eliminar" type="button" disabled>
+            Borrar categorías (0)
+        </button>
+    </div>
+
+    {% if categorias %}
+        <div class="rejilla">
+            {% for categoria in categorias %}
+                <article class="tarjeta">
+                    <div class="tarjeta-superior">
+                        <label>
+                            <input
+                                type="checkbox"
+                                class="seleccion-categoria"
+                                value="{{ categoria.id }}"
+                            >
+                            Seleccionar
+                        </label>
+
+                        <span class="estado {{ 'activa' if categoria.activa else 'inactiva' }}">
+                            {{ 'Activa' if categoria.activa else 'Inactiva' }}
+                        </span>
+                    </div>
+
+                    {% if categoria.portada %}
+                        <img
+                            class="portada"
+                            src="{{ url_for('static', filename=categoria.portada) }}"
+                            alt="Portada de {{ categoria.nombre }}"
+                        >
+                    {% else %}
+                        <div class="sin-portada">Sin portada</div>
+                    {% endif %}
+
+                    <div class="contenido">
+                        <h2>{{ categoria.nombre }}</h2>
+                        <p>Parejas: {{ categoria.cantidad_parejas }} / 50</p>
+
+                        <div class="dificultades">
+                            <span class="dificultad {{ '' if categoria.dificultades.facil else 'bloqueada' }}">
+                                Fácil
+                            </span>
+
+                            <span class="dificultad {{ '' if categoria.dificultades.media else 'bloqueada' }}">
+                                Medio
+                            </span>
+
+                            <span class="dificultad {{ '' if categoria.dificultades.dificil else 'bloqueada' }}">
+                                Difícil
+                            </span>
+                        </div>
+
+                        <div class="pie-tarjeta">
+                            <span>
+                                {{ 'Fácil disponible' if categoria.dificultades.facil else 'Aún sin dificultades' }}
+                            </span>
+
+                            <a href="#">Editar</a>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="vacio">
+            <h2>No se encontraron categorías</h2>
+            <p>Prueba con otros filtros o agrega una categoría nueva.</p>
+        </div>
+    {% endif %}
+
+</div>
+
+</body>
+</html>
