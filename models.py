@@ -1,5 +1,6 @@
 from sqlalchemy import CheckConstraint, Enum, ForeignKey, text
 from extensions import db
+from datetime import datetime
 
 
 class Usuario(db.Model):
@@ -188,3 +189,43 @@ class Partida(db.Model):
             name="chk_fechas_partida",
         ),
     )
+
+
+class SalaJugador(db.Model):
+    __tablename__ = "sala_jugador"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    sala_id = db.Column(
+        db.Integer,
+        db.ForeignKey("salas.id"),
+        nullable=False
+    )
+
+    usuario_id = db.Column(
+        db.Integer,
+        db.ForeignKey("usuarios.id"),
+        nullable=False
+    )
+
+    listo = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+        server_default=db.false()
+    )
+
+    fecha_union = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "sala_id",
+            "usuario_id",
+            name="uq_sala_jugador"
+        ),
+    )
+
