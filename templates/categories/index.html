@@ -19,12 +19,15 @@
             <p>Administra las categorías y sus parejas de cartas.</p>
         </div>
 
-        <a class="boton boton-agregar" href="#">
+        <a
+            class="boton boton-agregar"
+            href="{{ url_for('categories.create') }}"
+        >
             + Agregar nueva categoría
         </a>
     </div>
 
-    <form method="GET" action="{{ url_for('categorias.listar') }}">
+    <form method="GET" action="{{ url_for('categories.index') }}">
         <div class="filtros">
             <input
                 type="text"
@@ -79,7 +82,7 @@
             </select>
 
             <button type="submit">Aplicar filtros</button>
-            <a class="boton" href="{{ url_for('categorias.listar') }}">
+            <a class="boton" href="{{ url_for('categories.index') }}">
                 Limpiar
             </a>
         </div>
@@ -97,7 +100,7 @@
             {% for categoria in categorias %}
                 <article
                     class="tarjeta tarjeta-clicable"
-                    data-url="{{ url_for('categorias.detalle', categoria_id=categoria.id) }}"
+                    data-url="{{ url_for('categories.form', categoria_id=categoria.id) }}"
                     tabindex="0"
                     role="link"
                     aria-label="Ver detalles de {{ categoria.nombre }}"
@@ -156,6 +159,6 @@
     {% endif %}
 
 </div>
-<script src="{{ url_for('static', filename='js/categories.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/categories/categories.js') }}" defer></script>
 </body>
 </html>

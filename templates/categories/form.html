@@ -1,127 +1,391 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ categoria.nombre }} | Memorama</title>
 
-    <style>
-        @import url("{{ url_for('static', filename='css/categories.css') }}");
-    </style>
+    <title>
+        {% if modo == "crear" %}
+            Nueva categoría | Memorama
+        {% else %}
+            {{ categoria.nombre }} | Memorama
+        {% endif %}
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/categories.css') }}"
+    >
 </head>
 
 <body>
 <div class="contenedor">
 
-    <a
-        class="boton boton-volver"
-        href="{{ url_for('categorias.listar') }}"
-    >
+    <a class="boton boton-volver"
+       href="{{ url_for('categories.index') }}">
         ← Volver a categorías
     </a>
 
     <div class="encabezado">
         <div>
-            <h1>Detalles de la categoría</h1>
-            <p>Consulta la información y las parejas de cartas.</p>
+            {% if modo == "crear" %}
+                <h1>Nueva categoría</h1>
+                <p>Crea una categoría para tu memorama.</p>
+            {% elif modo == "editar" %}
+                <h1>Editar categoría</h1>
+                <p>Modifica los datos y administra sus tarjetas.</p>
+            {% else %}
+                <h1>Detalles de la categoría</h1>
+                <p>Consulta la información y las tarjetas registradas.</p>
+            {% endif %}
         </div>
     </div>
 
-    <section class="detalle-resumen">
-
-        {% if portada %}
-            <img
-                class="detalle-portada"
-                src="{{ url_for('static', filename=portada.imagen) }}"
-                alt="Portada de {{ categoria.nombre }}"
-            >
-        {% else %}
-            <div class="sin-portada detalle-portada">
-                Sin portada
-            </div>
-        {% endif %}
-
-        <div class="detalle-info">
-            <h1>{{ categoria.nombre }}</h1>
-
-            <p>
-                <strong>Estado:</strong>
-                <span class="estado-detalle {{ 'activa' if categoria.activa else 'inactiva' }}">
-                    {{ 'Activa' if categoria.activa else 'Inactiva' }}
-                </span>
-            </p>
-
-            <p>
-                <strong>Parejas registradas:</strong>
-                {{ cantidad_parejas }} / 50
-            </p>
-
-            <h3>Dificultades disponibles</h3>
-
-            <div class="dificultades">
-                <span class="dificultad {{ '' if dificultades.facil else 'bloqueada' }}">
-                    Fácil
-                </span>
-
-                <span class="dificultad {{ '' if dificultades.media else 'bloqueada' }}">
-                    Medio
-                </span>
-
-                <span class="dificultad {{ '' if dificultades.dificil else 'bloqueada' }}">
-                    Difícil
-                </span>
-            </div>
-
-            <div class="detalle-acciones">
-                <button
-                    type="button"
-                    class="editar-pendiente"
-                    disabled
-                    title="La edición se implementará posteriormente"
-                >
-                    Editar categoría (próximamente)
-                </button>
-            </div>
+    {% if error %}
+        <div class="mensaje-error" role="alert">
+            {{ error }}
         </div>
-    </section>
+    {% endif %}
 
-    <section>
-        <h2>Parejas de cartas</h2>
-        <p>
-            Estas son las {{ cantidad_parejas }} parejas registradas
-            en esta categoría.
-        </p>
+    {% if modo == "crear" %}
 
-        {% if parejas %}
-            <div class="parejas-rejilla">
-                {% for pareja in parejas %}
-                    <article class="pareja-tarjeta">
+        <section class="detalle-resumen">
+            <div class="detalle-info">
+                <h2>Información de la categoría</h2>
 
-                        <img
-                            class="pareja-imagen"
-                            src="{{ url_for('static', filename=pareja.imagen) }}"
-                            alt="{{ pareja.nombre }}"
-                            loading="lazy"
+                <form method="POST"
+                      action="{{ url_for('categories.create') }}">
+
+                    <label for="nombre">Nombre de la categoría</label>
+                    <input
+                        id="nombre"
+                        type="text"
+                        name="nombre"
+                        maxlength="100"
+                        required
+                    >
+
+                    <label>
+                        <input type="checkbox" name="activa" checked>
+                        Categoría activa
+                    </label>
+
+                    <p>
+                        Después de crearla podrás agregar sus tarjetas
+                        individualmente.
+                    </p>
+
+                    <button type="submit" class="boton">
+                        Crear categoría
+                    </button>
+                </form>
+            </div>
+        </section>
+
+    {% else %}
+
+        <section class="detalle-resumen">
+
+            {% if portada %}
+                <img
+                    class="detalle-portada"
+                    src="{{ url_for('static', filename=portada.imagen) }}"
+                    alt="Portada de {{ categoria.nombre }}"
+                >
+            {% else %}
+                <div class="sin-portada detalle-portada">
+                    Sin portada
+                </div>
+            {% endif %}
+
+            <div class="detalle-info">
+
+                {% if modo == "editar" %}
+                    <form
+                        method="POST"
+                        action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                    >
+                        <input type="hidden" name="action" value="save_details">
+
+                        <label for="nombre">Nombre de la categoría</label>
+                        <input
+                            id="nombre"
+                            type="text"
+                            name="nombre"
+                            value="{{ categoria.nombre }}"
+                            maxlength="100"
+                            required
                         >
 
-                        <h3>{{ pareja.nombre }}</h3>
 
-                        {% if portada and pareja.id == portada.id %}
-                            <p><strong>Portada de la categoría</strong></p>
+                        <div class="opcion-activa">
+                            <span id="etiqueta-activa">Categoría activa</span>
+
+                            <label class="switch">
+                                <input
+                                    type="checkbox"
+                                    name="activa"
+                                    aria-labelledby="etiqueta-activa"
+                                    {% if categoria.activa %}checked{% endif %}>
+                                <span class="switch-deslizador"></span>
+                            </label>
+                        </div>
+
+
+                        <button type="submit" class="boton">
+                            Guardar cambios
+                        </button>
+                    </form>
+                {% else %}
+                    <h1>{{ categoria.nombre }}</h1>
+
+                    <p>
+                        <strong>Estado:</strong>
+                        <span class="estado-detalle {{ 'activa' if categoria.activa else 'inactiva' }}">
+                            {{ 'Activa' if categoria.activa else 'Inactiva' }}
+                        </span>
+                    </p>
+                {% endif %}
+
+                <p>
+                    <strong>Tarjetas registradas:</strong>
+                    {{ cantidad_parejas }} / 50
+                </p>
+
+                <h3>Dificultades disponibles</h3>
+
+                <div class="dificultades">
+                    <span class="dificultad {{ '' if dificultades.facil else 'bloqueada' }}">
+                        Fácil
+                    </span>
+                    <span class="dificultad {{ '' if dificultades.media else 'bloqueada' }}">
+                        Medio
+                    </span>
+                    <span class="dificultad {{ '' if dificultades.dificil else 'bloqueada' }}">
+                        Difícil
+                    </span>
+                </div>
+
+                <div class="detalle-acciones">
+                    {% if modo == "ver" %}
+                        <a
+                            class="boton"
+                            href="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                        >
+                            Editar categoría
+                        </a>
+                    {% else %}
+                        <a
+                            class="boton"
+                            href="{{ url_for('categories.form', categoria_id=categoria.id) }}"
+                        >
+                            Cancelar edición
+                        </a>
+                    {% endif %}
+                </div>
+
+            </div>
+        </section>
+
+    {% endif %}
+
+    {% if modo != "crear" %}
+
+       
+            <section>
+                <h2>Tarjetas de la categoría</h2>
+
+                <p>
+                    {% if modo == "editar" %}
+                        Puedes agregar tarjetas nuevas o eliminar las existentes.
+                        Las imágenes no se reemplazan.
+                    {% else %}
+                        Estas son las {{ cantidad_parejas }} tarjetas registradas.
+                    {% endif %}
+                </p>
+
+                {% if modo == "editar" %}
+
+                <div class="barra-seleccion">
+                    <label class="seleccionar-todas">
+                        <input
+                            type="checkbox"
+                            id="seleccionar-todas-parejas"
+                            aria-label="Seleccionar todas las tarjetas"
+                        >
+                        <span>Seleccionar todas</span>
+                    </label>
+
+                    <span>
+                        Seleccionadas:
+                        <strong id="contador-seleccionadas">0</strong>
+                    </span>
+
+                    <form
+                        id="form-eliminar-seleccionadas"
+                        method="POST"
+                        action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                    >
+                        <input type="hidden" name="action" value="delete_pairs">
+
+                        <button
+                            type="submit"
+                            id="boton-eliminar-seleccionadas"
+                            class="boton boton-eliminar"
+                            disabled
+                        >
+                            Eliminar seleccionadas
+                        </button>
+                    </form>
+                </div>
+
+                {% endif %}
+
+                {% if parejas %}
+                    <div class="parejas-rejilla">
+                        {% for pareja in parejas %}
+                            <article class="pareja-tarjeta">
+
+                                {% if modo == "editar" %}
+                                    <label class="selector-pareja">
+                                        <input
+                                            type="checkbox"
+                                            class="checkbox-pareja"
+                                            name="parejas_seleccionadas"
+                                            value="{{ pareja.id }}"
+                                            form="form-eliminar-seleccionadas"
+                                            aria-label="Seleccionar {{ pareja.nombre }}"
+                                        >
+                                    </label>
+                                {% endif %}
+
+
+                                <img
+                                    class="pareja-imagen"
+                                    src="{{ url_for('static', filename=pareja.imagen) }}"
+                                    alt="{{ pareja.nombre }}"
+                                    loading="lazy"
+                                >
+
+                                {% if modo == "editar" %}
+                                    <form
+                                        method="POST"
+                                        action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                                        class="formulario-nombre-tarjeta"
+                                    >
+                                        <input type="hidden" name="action" value="rename_pair">
+                                        <input type="hidden" name="pareja_id" value="{{ pareja.id }}">
+
+                                        <input
+                                            id="nombre-tarjeta-{{ pareja.id }}"
+                                            type="text"
+                                            name="nombre"
+                                            value="{{ pareja.nombre }}"
+                                            maxlength="100"
+                                            required
+                                        >
+                                    </form>
+                                   
+                                        <div class="acciones-pareja">
+                                            <form method="POST"
+                                                action="{{ url_for('categories.edit', categoria_id=categoria.id) }}">
+                                                <input type="hidden" name="action" value="delete_pair">
+                                                <input type="hidden" name="pareja_id" value="{{ pareja.id }}">
+                                                <button type="submit" class="boton boton-eliminar"
+                                                    onclick="return confirm('¿Eliminar esta tarjeta? Esta acción no se puede deshacer.');">
+                                                    Eliminar tarjeta
+                                                </button>
+                                            </form>
+
+                                            <form method="POST"
+                                                action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                                                class="formulario-portada">
+                                                <input type="hidden" name="action" value="set_cover">
+                                                <input type="hidden" name="pareja_id" value="{{ pareja.id }}">
+
+                                                <label class="selector-portada" title="Designar como portada">
+                                                    <input type="checkbox" name="portada"
+                                                        {% if portada and portada.id == pareja.id %}checked{% endif %}
+                                                        aria-label="Designar {{ pareja.nombre }} como portada"
+                                                        onchange="this.form.requestSubmit()">
+                                                </label>
+                                            </form>
+                                        </div>
+
+                                {% else %}
+                                    <h3>{{ pareja.nombre }}</h3>
+                                {% endif %}
+
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="parejas-vacias">
+                        Esta categoría todavía no tiene tarjetas.
+                    </p>
+                {% endif %}
+            </section>
+
+            {% if modo == "editar" %}
+                <section class="detalle-resumen">
+                    <div class="detalle-info">
+                        <h2>Agregar tarjeta</h2>
+                        <p>Selecciona una imagen y escribe el nombre de la tarjeta.</p>
+
+                        {% if cantidad_parejas < 50 %}
+                            <form
+                                method="POST"
+                                enctype="multipart/form-data"
+                                action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                            >
+                                <input type="hidden" name="action" value="add_pair">
+
+                                <label for="nombre_tarjeta">Nombre de la tarjeta</label>
+                                <input
+                                    id="nombre_tarjeta"
+                                    type="text"
+                                    name="nombre_tarjeta"
+                                    maxlength="100"
+                                    required
+                                >
+
+                                <label for="imagen_tarjeta">Imagen</label>
+                                <input
+                                    id="imagen_tarjeta"
+                                    type="file"
+                                    name="imagen_tarjeta"
+                                    accept=".png,.jpg,.jpeg,.webp,.gif"
+                                    required
+                                >
+
+                                <button type="submit" class="boton">
+                                    Agregar tarjeta
+                                </button>
+                            </form>
+                        {% else %}
+                            <p>La categoría ya alcanzó el límite de 50 tarjetas.</p>
                         {% endif %}
+                    </div>
+                </section>
 
-                    </article>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="parejas-vacias">
-                <h3>Esta categoría aún no tiene parejas</h3>
-                <p>Cuando agregues cartas, aparecerán aquí.</p>
-            </div>
         {% endif %}
-    </section>
+
+    {% endif %}
 
 </div>
+
+<script
+    src="{{ url_for('static', filename='js/categories/categories.js') }}"
+    defer
+></script>
+
+{% if modo == "editar" %}
+<script
+    src="{{ url_for('static', filename='js/categories/category-form.js') }}"
+    defer
+></script>
+{% endif %}
+
 </body>
+
 </html>

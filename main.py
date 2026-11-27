@@ -57,9 +57,9 @@ def health():
 # --------------------------------------------------------------------------
 # Persona 3: Modelos y CRUD de categorías / parejas de cartas
 # --------------------------------------------------------------------------
-from categories import categorias_bp
+from categories import categories_bp
 
-app.register_blueprint(categorias_bp)
+app.register_blueprint(categories_bp)
 
 # --------------------------------------------------------------------------
 # Persona 4: Salas (lista, anfitrión, listos, eventos Socket.IO por sala)
