@@ -14,9 +14,7 @@
 
     <div class="rooms-header">
         <h1>Salas de juego</h1>
-        <p>
-            Consulta las salas disponibles y únete a una partida.
-        </p>
+        <p>Consulta las salas disponibles y unete a una partida.</p>
     </div>
 
     {% if salas %}
@@ -40,7 +38,7 @@
                     <div class="room-information">
 
                         <p>
-                            <strong>Categoría:</strong>
+                            <strong>Categoria:</strong>
                             {{ sala.categoria }}
                         </p>
 
@@ -55,11 +53,66 @@
                         </p>
 
                         <p>
-                            <strong>Anfitrión:</strong>
+                            <strong>Anfitrion:</strong>
                             {{ sala.anfitrion or "Sin asignar" }}
                         </p>
 
                     </div>
+
+                    <div class="room-actions">
+
+                        {% if sala.pertenece %}
+
+                            <a
+                                class="room-button"
+                                href="{{ url_for(
+                                    'rooms.ver_sala',
+                                    sala_id=sala.id
+                                ) }}">
+                                Volver a la sala
+                            </a>
+
+                        {% elif sala.estado != "en_curso"
+                              and sala.jugadores < 2 %}
+
+                            <button
+                                type="button"
+                                class="room-button"
+                                data-enter-url="{{ url_for(
+                                    'rooms.entrar_sala',
+                                    sala_id=sala.id
+                                ) }}"
+                                data-room-id="{{ sala.id }}"
+                                data-lobby-url="{{ url_for(
+                                    'rooms.ver_sala',
+                                    sala_id=sala.id
+                                ) }}">
+                                Entrar a la sala
+                            </button>
+
+                        {% else %}
+
+                            <button
+                                type="button"
+                                class="room-button"
+                                disabled>
+                                {% if sala.estado == "en_curso" %}
+                                    Partida en curso
+                                {% else %}
+                                    Sala llena
+                                {% endif %}
+                            </button>
+
+                        {% endif %}
+
+                    </div>
+
+                    <p
+                        class="room-message"
+                        id="mensaje-sala-{{ sala.id }}"
+                        role="status"
+                        aria-live="polite">
+                    </p>
 
                 </article>
 
@@ -77,4 +130,8 @@
 
 </section>
 
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/rooms.js') }}"></script>
 {% endblock %}

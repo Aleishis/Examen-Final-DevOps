@@ -73,3 +73,203 @@
     padding: 20px;
     text-align: center;
 }
+
+/* ---------------------------------------------------
+   Acciones de las tarjetas de salas
+--------------------------------------------------- */
+
+.room-actions {
+    margin-top: 18px;
+}
+
+.room-button,
+.leave-button {
+    display: inline-block;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+    background-color: #4b5bdc;
+    color: white;
+    transition: background-color 0.2s ease;
+}
+
+.room-button:hover:not(:disabled) {
+    background-color: #3848c7;
+}
+
+.room-button:disabled,
+.leave-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.room-message {
+    margin-top: 12px;
+    font-size: 14px;
+}
+
+.room-message:empty {
+    display: none;
+}
+
+.message-error {
+    color: #b91c1c;
+}
+
+.message-success {
+    color: #166534;
+}
+
+
+/* ---------------------------------------------------
+   Pantalla de espera
+--------------------------------------------------- */
+
+.lobby-page {
+    max-width: 750px;
+    margin: 0 auto;
+}
+
+.lobby-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.lobby-header h1 {
+    margin: 0;
+}
+
+.lobby-information {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 24px;
+}
+
+.lobby-information p {
+    margin: 8px 0;
+}
+
+
+/* ---------------------------------------------------
+   Lista de participantes
+--------------------------------------------------- */
+
+.lobby-players {
+    margin-bottom: 24px;
+}
+
+.lobby-players h2 {
+    margin-bottom: 14px;
+}
+
+.lobby-player {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+}
+
+.player-information h3 {
+    margin: 0 0 6px;
+}
+
+.host-label,
+.participant-label {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.host-label {
+    color: #4b5bdc;
+}
+
+.participant-label {
+    color: #666;
+}
+
+.waiting-player {
+    padding: 18px;
+    border: 1px dashed #aaa;
+    border-radius: 10px;
+    text-align: center;
+    color: #666;
+}
+
+.transfer-button {
+    background-color: #667085;
+}
+
+.transfer-button:hover:not(:disabled) {
+    background-color: #475467;
+}
+
+
+/* ---------------------------------------------------
+   Acciones de la pantalla de espera
+--------------------------------------------------- */
+
+.lobby-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.leave-button {
+    background-color: #dc3545;
+}
+
+.leave-button:hover:not(:disabled) {
+    background-color: #b42332;
+}
+
+.back-link {
+    color: #4b5bdc;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+
+/* ---------------------------------------------------
+   Diseño adaptable
+--------------------------------------------------- */
+
+@media (max-width: 600px) {
+
+    .lobby-player {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .lobby-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .lobby-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+}
+

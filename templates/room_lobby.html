@@ -1,0 +1,133 @@
+
+{% extends "base.html" %}
+
+{% block title %}{{ sala.nombre }} | Memorama PvP{% endblock %}
+
+{% block head %}
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='css/rooms.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<section class="lobby-page">
+
+    <div class="lobby-header">
+
+        <h1>{{ sala.nombre }}</h1>
+
+        <span class="room-status estado-{{ sala.estado }}">
+            {% if sala.estado == "esperando" %}
+                Esperando jugadores
+            {% elif sala.estado == "en_curso" %}
+                En curso
+            {% else %}
+                Disponible
+            {% endif %}
+        </span>
+
+    </div>
+
+    <div class="lobby-information">
+
+        <p>
+            <strong>Categoria:</strong>
+            {{ categoria.nombre }}
+        </p>
+
+        <p>
+            <strong>Dificultad:</strong>
+            {{ sala.dificultad }}
+        </p>
+
+        <p>
+            <strong>Jugadores:</strong>
+            {{ jugadores|length }}/2
+        </p>
+
+    </div>
+
+    <div class="lobby-players">
+
+        <h2>Participantes</h2>
+
+        {% for jugador in jugadores %}
+
+            <article class="lobby-player">
+
+                <div class="player-information">
+
+                    <h3>{{ jugador.username }}</h3>
+
+                    {% if jugador.id == sala.anfitrion_id %}
+                        <span class="host-label">Anfitrion</span>
+                    {% else %}
+                        <span class="participant-label">Participante</span>
+                    {% endif %}
+
+                </div>
+
+                {% if es_anfitrion and jugador.id != usuario_id %}
+
+                    <button
+                        type="button"
+                        class="room-button transfer-button"
+                        data-transfer-url="{{ url_for(
+                            'rooms.transferir_anfitrion',
+                            sala_id=sala.id
+                        ) }}"
+                        data-player-id="{{ jugador.id }}">
+                        Transferir anfitrion
+                    </button>
+
+                {% endif %}
+
+            </article>
+
+        {% endfor %}
+
+        {% if jugadores|length < 2 %}
+
+            <div class="waiting-player">
+                Esperando al segundo jugador...
+            </div>
+
+        {% endif %}
+
+    </div>
+
+    <div class="lobby-actions">
+
+        <button
+            type="button"
+            class="leave-button"
+            id="leave-room"
+            data-exit-url="{{ url_for(
+                'rooms.salir_sala',
+                sala_id=sala.id
+            ) }}">
+            Abandonar sala
+        </button>
+
+        <a
+            class="back-link"
+            href="{{ url_for('rooms.listar_salas') }}">
+            Volver al listado
+        </a>
+
+    </div>
+
+    <p
+        id="lobby-message"
+        class="room-message"
+        role="status"
+        aria-live="polite">
+    </p>
+
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/rooms.js') }}"></script>
+{% endblock %}

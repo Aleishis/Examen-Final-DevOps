@@ -290,3 +290,55 @@ def test_salida_del_ultimo_jugador_libera_la_sala(client):
     assert SalaJugador.query.filter_by(
         sala_id=sala_id
     ).count() == 0
+
+
+# -------------------------------------------------------------------
+# Prueba 7: Un jugador puede consultar su sala
+# -------------------------------------------------------------------
+
+def test_jugador_puede_ver_su_sala(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+
+    # Autenticar al jugador.
+    autenticar(client, primer_jugador)
+
+    # Entrar a la sala.
+    entrada = client.post(
+        f"/salas/{sala_id}/entrar"
+    )
+
+    assert entrada.status_code == 201
+
+    # Consultar la pantalla de espera.
+    respuesta = client.get(
+        f"/salas/{sala_id}"
+    )
+
+    assert respuesta.status_code == 200
+    assert b"jugador1" in respuesta.data
+    assert b"Anfitrion" in respuesta.data
+    assert b"Participantes" in respuesta.data
+
+
+# -------------------------------------------------------------------
+# Prueba 8: Un usuario ajeno no puede consultar la sala
+# -------------------------------------------------------------------
+
+def test_usuario_ajeno_no_puede_ver_sala(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    usuario_ajeno = usuarios[0]
+
+    # El usuario tiene sesion, pero no pertenece a la sala.
+    autenticar(client, usuario_ajeno)
+
+    respuesta = client.get(
+        f"/salas/{sala_id}"
+    )
+
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/salas")

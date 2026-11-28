@@ -1,5 +1,13 @@
 
-from flask import Blueprint, jsonify, render_template, request, session
+from flask import (
+    Blueprint,
+    jsonify,
+    render_template,
+    request,
+    session,
+    redirect,
+    url_for
+)
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -60,6 +68,21 @@ def obtener_sala_bloqueada(sala_id):
 @rooms_bp.route("/salas", methods=["GET"])
 def listar_salas():
 
+    # Identificar las salas en las que participa el usuario actual.
+    usuario_id = obtener_usuario_sesion()
+
+    salas_usuario = set()
+
+    if usuario_id is not None:
+        ids_salas = db.session.scalars(
+            select(SalaJugador.sala_id).where(
+                SalaJugador.usuario_id == usuario_id
+            )
+        ).all()
+
+        salas_usuario = set(ids_salas)
+
+    # Consultar las salas junto con su categoria y anfitrion.
     registros = (
         db.session.query(Sala, Categoria, Usuario)
         .join(Categoria, Categoria.id == Sala.categoria_id)
@@ -114,10 +137,77 @@ def listar_salas():
             "anfitrion": (
                 anfitrion.username if anfitrion else None
             ),
-            "jugadores": jugadores_por_sala.get(sala.id, 0)
+            "jugadores": jugadores_por_sala.get(sala.id, 0),
+            "pertenece": sala.id in salas_usuario
         })
 
     return render_template("rooms.html", salas=salas)
+
+
+# -------------------------------------------------------------------
+# Actividad 2: Pantalla de espera de una sala
+# -------------------------------------------------------------------
+
+@rooms_bp.route(
+    "/salas/<int:sala_id>",
+    methods=["GET"]
+)
+def ver_sala(sala_id):
+
+    usuario_id = obtener_usuario_sesion()
+
+    # Solamente usuarios con sesion pueden acceder.
+    if usuario_id is None:
+        return redirect(url_for("rooms.listar_salas"))
+
+    # Comprobar que la sala exista.
+    sala = db.session.get(Sala, sala_id)
+
+    if sala is None:
+        return "La sala solicitada no existe.", 404
+
+    # Obtener los jugadores registrados en la sala.
+    participaciones = (
+        db.session.query(SalaJugador, Usuario)
+        .join(Usuario, Usuario.id == SalaJugador.usuario_id)
+        .filter(SalaJugador.sala_id == sala_id)
+        .order_by(
+            SalaJugador.fecha_union.asc(),
+            SalaJugador.id.asc()
+        )
+        .all()
+    )
+
+    # Comprobar que el usuario actual pertenezca a la sala.
+    ids_jugadores = [
+        participacion.usuario_id
+        for participacion, usuario in participaciones
+    ]
+
+    if usuario_id not in ids_jugadores:
+        return redirect(url_for("rooms.listar_salas"))
+
+    # Preparar la informacion de los participantes.
+    jugadores = []
+
+    for participacion, usuario in participaciones:
+        jugadores.append({
+            "id": usuario.id,
+            "username": usuario.username,
+            "listo": participacion.listo
+        })
+
+    # Obtener la categoria de la sala.
+    categoria = db.session.get(Categoria, sala.categoria_id)
+
+    return render_template(
+        "room_lobby.html",
+        sala=sala,
+        categoria=categoria,
+        jugadores=jugadores,
+        usuario_id=usuario_id,
+        es_anfitrion=(sala.anfitrion_id == usuario_id)
+    )
 
 
 # -------------------------------------------------------------------
