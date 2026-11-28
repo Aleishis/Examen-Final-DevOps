@@ -325,3 +325,51 @@
 }
 
 
+/* ---------------------------------------------------
+   Configuracion de categoria y dificultad
+--------------------------------------------------- */
+
+.lobby-configuration {
+    padding: 20px;
+    margin-bottom: 24px;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+}
+
+.lobby-configuration h2 {
+    margin-top: 0;
+}
+
+.lobby-configuration p {
+    color: #666;
+}
+
+.config-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 18px 0;
+}
+
+.config-field label {
+    font-weight: 600;
+}
+
+.config-field select {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: white;
+    color: #1f2430;
+    font-size: 14px;
+}
+
+.config-note {
+    font-size: 13px;
+    margin-bottom: 0;
+}
+
+

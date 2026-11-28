@@ -36,6 +36,138 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     // ---------------------------------------------------------------
+    // Configuracion de categoria y dificultad
+    // ---------------------------------------------------------------
+
+    const configForm = document.getElementById("room-config-form");
+
+    if (configForm) {
+
+        const categorySelect = document.getElementById(
+            "category-select"
+        );
+
+        const difficultySelect = document.getElementById(
+            "difficulty-select"
+        );
+
+        const saveButton = document.getElementById("save-config");
+
+        const mensaje = document.getElementById("lobby-message");
+
+        const difficultyLabels = {
+            facil: "Facil",
+            media: "Media",
+            dificil: "Dificil"
+        };
+
+
+        // Actualizar las dificultades segun la categoria seleccionada.
+        function actualizarDificultades() {
+
+            const opcionSeleccionada =
+                categorySelect.selectedOptions[0];
+
+            const dificultades = (
+                opcionSeleccionada.dataset.difficulties || ""
+            )
+                .split(",")
+                .filter(Boolean);
+
+            const dificultadAnterior = difficultySelect.value;
+
+            difficultySelect.replaceChildren();
+
+            dificultades.forEach(dificultad => {
+
+                const option = document.createElement("option");
+
+                option.value = dificultad;
+                option.textContent = difficultyLabels[dificultad];
+
+                difficultySelect.appendChild(option);
+
+            });
+
+            if (dificultades.includes(dificultadAnterior)) {
+
+                difficultySelect.value = dificultadAnterior;
+
+            } else if (dificultades.length > 0) {
+
+                difficultySelect.value = dificultades[0];
+
+            }
+
+            saveButton.disabled = dificultades.length === 0;
+        }
+
+
+        // Actualizar dificultades cuando cambia la categoria.
+        categorySelect.addEventListener(
+            "change",
+            actualizarDificultades
+        );
+
+
+        // Guardar la configuracion de la sala.
+        configForm.addEventListener("submit", async event => {
+
+            event.preventDefault();
+
+            saveButton.disabled = true;
+
+            try {
+
+                const response = await fetch(
+                    configForm.dataset.configUrl,
+                    {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        body: JSON.stringify({
+                            categoria_id: Number(categorySelect.value),
+                            dificultad: difficultySelect.value
+                        })
+                    }
+                );
+
+                const datos = await leerRespuesta(response);
+
+                mostrarMensaje(
+                    mensaje,
+                    datos.mensaje,
+                    false
+                );
+
+                // Recargar para mostrar la nueva configuracion.
+                window.location.reload();
+
+            } catch (error) {
+
+                mostrarMensaje(
+                    mensaje,
+                    error.message,
+                    true
+                );
+
+                saveButton.disabled = false;
+            }
+
+        });
+
+
+        // Cargar las dificultades correspondientes al inicio.
+        actualizarDificultades();
+
+    }
+
+
+
+    // ---------------------------------------------------------------
     // Entrada a una sala
     // ---------------------------------------------------------------
 

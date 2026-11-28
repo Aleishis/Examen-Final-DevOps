@@ -1,7 +1,12 @@
 
 from extensions import db
-from models import Categoria, Sala, SalaJugador, Usuario
-
+from models import (
+    Categoria,
+    ParejaCarta,
+    Sala,
+    SalaJugador,
+    Usuario
+)
 
 def preparar_escenario():
     """
@@ -39,6 +44,191 @@ def preparar_escenario():
     db.session.commit()
 
     return sala.id, [usuario.id for usuario in usuarios]
+
+
+def crear_categoria_con_parejas(nombre, cantidad):
+    """
+    Crea una categoria con una cantidad especifica de parejas
+    para probar la seleccion de dificultades.
+    """
+
+    categoria = Categoria(nombre=nombre)
+
+    db.session.add(categoria)
+    db.session.flush()
+
+    for numero in range(1, cantidad + 1):
+
+        pareja = ParejaCarta(
+            categoria_id=categoria.id,
+            nombre=f"Par {numero}",
+            imagen=f"images/pruebas/par_{numero}.png"
+        )
+
+        db.session.add(pareja)
+
+    db.session.commit()
+
+    return categoria.id
+
+
+def test_anfitrion_puede_actualizar_configuracion(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    anfitrion = usuarios[0]
+
+    categoria_id = crear_categoria_con_parejas(
+        "Frutas de prueba",
+        25
+    )
+
+    autenticar(client, anfitrion)
+
+    client.post(f"/salas/{sala_id}/entrar")
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/configuracion",
+        json={
+            "categoria_id": categoria_id,
+            "dificultad": "dificil"
+        }
+    )
+
+    assert respuesta.status_code == 200
+
+    datos = respuesta.get_json()
+
+    assert datos["categoria_id"] == categoria_id
+    assert datos["dificultad"] == "dificil"
+    assert datos["cantidad_pares"] == 25
+
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.categoria_id == categoria_id
+    assert sala.dificultad == "dificil"
+
+
+def test_participante_no_puede_actualizar_configuracion(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    anfitrion = usuarios[0]
+    participante = usuarios[1]
+
+    categoria_id = crear_categoria_con_parejas(
+        "Vocaloid de prueba",
+        25
+    )
+
+    autenticar(client, anfitrion)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    autenticar(client, participante)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/configuracion",
+        json={
+            "categoria_id": categoria_id,
+            "dificultad": "dificil"
+        }
+    )
+
+    assert respuesta.status_code == 403
+
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.categoria_id != categoria_id
+
+
+def test_no_permite_dificultad_no_disponible(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    anfitrion = usuarios[0]
+
+    categoria_id = crear_categoria_con_parejas(
+        "Paw Patrol de prueba",
+        9
+    )
+
+    autenticar(client, anfitrion)
+
+    client.post(f"/salas/{sala_id}/entrar")
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/configuracion",
+        json={
+            "categoria_id": categoria_id,
+            "dificultad": "dificil"
+        }
+    )
+
+    assert respuesta.status_code == 400
+
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.categoria_id != categoria_id
+
+
+def test_cambiar_configuracion_reinicia_estado_listo(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    anfitrion = usuarios[0]
+    participante = usuarios[1]
+
+    categoria_id = crear_categoria_con_parejas(
+        "Dragon Ball de prueba",
+        25
+    )
+
+    # Ambos jugadores entran.
+    autenticar(client, anfitrion)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    autenticar(client, participante)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    # Ambos jugadores se marcan como listos.
+    autenticar(client, anfitrion)
+
+    client.post(
+        f"/salas/{sala_id}/listo",
+        json={"listo": True}
+    )
+
+    autenticar(client, participante)
+
+    client.post(
+        f"/salas/{sala_id}/listo",
+        json={"listo": True}
+    )
+
+    # El anfitrion cambia la configuracion.
+    autenticar(client, anfitrion)
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/configuracion",
+        json={
+            "categoria_id": categoria_id,
+            "dificultad": "media"
+        }
+    )
+
+    assert respuesta.status_code == 200
+
+    # Comprobar que ambos jugadores vuelven a no estar listos.
+    participaciones = SalaJugador.query.filter_by(
+        sala_id=sala_id
+    ).all()
+
+    assert len(participaciones) == 2
+    assert all(
+        not jugador.listo
+        for jugador in participaciones
+    )
 
 
 def autenticar(client, usuario_id):

@@ -30,6 +30,107 @@
 
     <div class="lobby-information">
 
+{% if es_anfitrion and sala.estado != "en_curso" %}
+
+    <section class="lobby-configuration">
+
+        <h2>Configuracion de la partida</h2>
+
+        <p>
+            Selecciona la categoria y dificultad de la partida.
+        </p>
+
+        <form
+            id="room-config-form"
+            data-config-url="{{ url_for(
+                'rooms.actualizar_configuracion',
+                sala_id=sala.id
+            ) }}">
+
+            <div class="config-field">
+
+                <label for="category-select">
+                    Categoria de cartas
+                </label>
+
+                <select id="category-select" name="categoria_id" required>
+
+                    {% for opcion in categorias_configurables %}
+
+                        <option
+                            value="{{ opcion.id }}"
+                            data-difficulties="{{ opcion.dificultades|join(',') }}"
+                            {% if opcion.id == sala.categoria_id %}selected{% endif %}>
+
+                            {{ opcion.nombre }}
+                            ({{ opcion.cantidad_pares }} parejas)
+
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <div class="config-field">
+
+                <label for="difficulty-select">
+                    Dificultad
+                </label>
+
+                <select id="difficulty-select" name="dificultad" required>
+
+                    <option value="facil"
+                        {% if sala.dificultad == "facil" %}selected{% endif %}>
+                        Facil
+                    </option>
+
+                    <option value="media"
+                        {% if sala.dificultad == "media" %}selected{% endif %}>
+                        Media
+                    </option>
+
+                    <option value="dificil"
+                        {% if sala.dificultad == "dificil" %}selected{% endif %}>
+                        Dificil
+                    </option>
+
+                </select>
+
+            </div>
+
+            <button type="submit" class="room-button" id="save-config">
+                Guardar configuracion
+            </button>
+
+        </form>
+
+    </section>
+
+{% else %}
+
+    <section class="lobby-configuration">
+
+        <h2>Configuracion de la partida</h2>
+
+        <p>
+            Categoria: {{ categoria.nombre }}
+        </p>
+
+        <p>
+            Dificultad: {{ sala.dificultad }}
+        </p>
+
+        <p class="config-note">
+            Solamente el anfitrion puede modificar la configuracion.
+        </p>
+
+    </section>
+
+{% endif %}
+
+
         <p>
             <strong>Categoria:</strong>
             {{ categoria.nombre }}
