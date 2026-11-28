@@ -35,6 +35,13 @@ app.register_blueprint(rooms_bp)
 # Un solo proceso (gunicorn -w 1): las salas de Socket.IO viven en memoria.
 socketio = SocketIO(app)
 
+# Permite que los demas modulos accedan a la instancia. Persona 4
+app.extensions["socketio"] = socketio
+
+# Persona 4: Registro de los eventos de gestion de salas 
+from room_events import registrar_eventos_salas
+
+registrar_eventos_salas(socketio)
 
 # --------------------------------------------------------------------------
 # Rutas base / DevOps

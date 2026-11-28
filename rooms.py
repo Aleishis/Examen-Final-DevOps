@@ -1,4 +1,11 @@
 
+# -------------------------------------------------------------------
+# Importaciones
+# -------------------------------------------------------------------
+
+from pathlib import Path
+from importlib.util import module_from_spec, spec_from_file_location
+
 from flask import (
     Blueprint,
     jsonify,
@@ -12,11 +19,10 @@ from flask import (
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
-
 from extensions import db
 from models import Sala, SalaJugador, Categoria, Usuario
+
+from room_events import emitir_actualizacion_sala
 
 
 rooms_bp = Blueprint("rooms", __name__)
@@ -276,7 +282,6 @@ def ver_sala(sala_id):
 
         dificultades = obtener_dificultades(cantidad_pares)
 
-        # Solo permitir categorias con suficientes parejas.
         if dificultades:
             categorias_configurables.append({
                 "id": categoria_opcion.id,
@@ -296,309 +301,6 @@ def ver_sala(sala_id):
         mi_estado_listo=mi_estado_listo,
         categorias_configurables=categorias_configurables
     )
-
-
-# -------------------------------------------------------------------
-# Actividad 3: Gestion del estado de preparacion
-# -------------------------------------------------------------------
-
-@rooms_bp.route(
-    "/salas/<int:sala_id>/listo",
-    methods=["POST"]
-)
-def actualizar_estado_listo(sala_id):
-
-    usuario_id = obtener_usuario_sesion()
-
-    if usuario_id is None:
-        return respuesta_error(
-            "Debes iniciar sesion.",
-            401
-        )
-
-    datos = request.get_json(silent=True)
-
-    # Validar que se envie un valor booleano.
-    if (
-        not isinstance(datos, dict)
-        or not isinstance(datos.get("listo"), bool)
-    ):
-        return respuesta_error(
-            "Debes indicar si estas listo o no.",
-            400
-        )
-
-    nuevo_estado = datos["listo"]
-
-    try:
-        sala = obtener_sala_bloqueada(sala_id)
-
-        if sala is None:
-            db.session.rollback()
-            return respuesta_error(
-                "La sala no existe.",
-                404
-            )
-
-        if sala.estado == "en_curso":
-            db.session.rollback()
-            return respuesta_error(
-                "La partida ya esta en curso.",
-                409
-            )
-
-        participaciones = obtener_participantes_bloqueados(
-            sala_id
-        )
-
-        # Verificar que el usuario pertenezca a la sala.
-        participacion_usuario = next(
-            (
-                participacion
-                for participacion in participaciones
-                if participacion.usuario_id == usuario_id
-            ),
-            None
-        )
-
-        if participacion_usuario is None:
-            db.session.rollback()
-            return respuesta_error(
-                "No perteneces a esta sala.",
-                403
-            )
-
-        # Se necesitan exactamente dos jugadores.
-        if len(participaciones) != 2:
-            db.session.rollback()
-            return respuesta_error(
-                "Se necesitan dos jugadores para marcar "
-                "la sala como lista.",
-                409
-            )
-
-        # Actualizar el estado individual del jugador.
-        participacion_usuario.listo = nuevo_estado
-
-        # Comprobar si ambos estan preparados.
-        todos_listos = all(
-            participacion.listo
-            for participacion in participaciones
-        )
-
-        db.session.commit()
-
-        mensaje = (
-            "Ambos jugadores estan listos. "
-            "La sala esta preparada para comenzar."
-            if todos_listos
-            else "Tu estado de preparacion se actualizo correctamente."
-        )
-
-        return jsonify({
-            "ok": True,
-            "mensaje": mensaje,
-            "listo": nuevo_estado,
-            "todos_listos": todos_listos
-        }), 200
-
-    except IntegrityError:
-        db.session.rollback()
-        return respuesta_error(
-            "No fue posible actualizar el estado de preparacion.",
-            409
-        )
-
-
-# -------------------------------------------------------------------
-# Actividad 4: Seleccion de categoria y dificultad
-# -------------------------------------------------------------------
-
-@rooms_bp.route(
-    "/salas/<int:sala_id>/configuracion",
-    methods=["POST"]
-)
-def actualizar_configuracion(sala_id):
-
-    usuario_id = obtener_usuario_sesion()
-
-    if usuario_id is None:
-        return respuesta_error(
-            "Debes iniciar sesion.",
-            401
-        )
-
-    datos = request.get_json(silent=True)
-
-    if not isinstance(datos, dict):
-        return respuesta_error(
-            "Debes proporcionar la configuracion.",
-            400
-        )
-
-    # Validar el identificador de la categoria.
-    categoria_recibida = datos.get("categoria_id")
-
-    if isinstance(categoria_recibida, bool):
-        return respuesta_error(
-            "El identificador de la categoria no es valido.",
-            400
-        )
-
-    if isinstance(categoria_recibida, int):
-        categoria_id = categoria_recibida
-
-    elif (
-        isinstance(categoria_recibida, str)
-        and categoria_recibida.strip().isdigit()
-    ):
-        categoria_id = int(categoria_recibida.strip())
-
-    else:
-        return respuesta_error(
-            "El identificador de la categoria no es valido.",
-            400
-        )
-
-    dificultad = datos.get("dificultad")
-
-    dificultades_validas = {
-        "facil",
-        "media",
-        "dificil"
-    }
-
-    if (
-        not isinstance(dificultad, str)
-        or dificultad not in dificultades_validas
-    ):
-        return respuesta_error(
-            "La dificultad seleccionada no es valida.",
-            400
-        )
-
-    try:
-        # Bloquear la sala durante la configuracion.
-        sala = obtener_sala_bloqueada(sala_id)
-
-        if sala is None:
-            db.session.rollback()
-            return respuesta_error(
-                "La sala no existe.",
-                404
-            )
-
-        if sala.estado == "en_curso":
-            db.session.rollback()
-            return respuesta_error(
-                "No puedes modificar una partida que ya esta en curso.",
-                409
-            )
-
-        # Solamente el anfitrion puede cambiar la configuracion.
-        if sala.anfitrion_id != usuario_id:
-            db.session.rollback()
-            return respuesta_error(
-                "Solamente el anfitrion puede cambiar "
-                "la categoria y dificultad.",
-                403
-            )
-
-        participaciones = obtener_participantes_bloqueados(
-            sala_id
-        )
-
-        anfitrion_pertenece = any(
-            jugador.usuario_id == usuario_id
-            for jugador in participaciones
-        )
-
-        if not anfitrion_pertenece:
-            db.session.rollback()
-            return respuesta_error(
-                "No perteneces a esta sala.",
-                403
-            )
-
-        # Consultar la categoria solicitada.
-        categoria = db.session.get(
-            Categoria,
-            categoria_id
-        )
-
-        if categoria is None:
-            db.session.rollback()
-            return respuesta_error(
-                "La categoria seleccionada no existe.",
-                404
-            )
-
-        if not categoria.activa:
-            db.session.rollback()
-            return respuesta_error(
-                "La categoria seleccionada no esta disponible.",
-                409
-            )
-
-        # Contar las parejas disponibles.
-        cantidad_pares = contar_parejas_categoria(
-            categoria_id
-        )
-
-        # Obtener las dificultades permitidas.
-        dificultades_disponibles = obtener_dificultades(
-            cantidad_pares
-        )
-
-        if not dificultades_disponibles:
-            db.session.rollback()
-            return respuesta_error(
-                "La categoria no tiene suficientes parejas "
-                "para iniciar una partida.",
-                409
-            )
-
-        if dificultad not in dificultades_disponibles:
-            db.session.rollback()
-            return respuesta_error(
-                "La dificultad seleccionada no esta disponible "
-                "para esta categoria.",
-                400
-            )
-
-        # Comprobar si realmente cambio la configuracion.
-        configuracion_modificada = (
-            sala.categoria_id != categoria_id
-            or sala.dificultad != dificultad
-        )
-
-        sala.categoria_id = categoria_id
-        sala.dificultad = dificultad
-
-        # Reiniciar preparacion solamente si hubo cambios.
-        if configuracion_modificada:
-            for jugador in participaciones:
-                jugador.listo = False
-
-        db.session.commit()
-
-        return jsonify({
-            "ok": True,
-            "mensaje": "La configuracion de la sala se actualizo correctamente.",
-            "categoria_id": categoria.id,
-            "categoria": categoria.nombre,
-            "cantidad_pares": cantidad_pares,
-            "dificultad": dificultad,
-            "dificultades_disponibles": dificultades_disponibles,
-            "configuracion_modificada": configuracion_modificada
-        }), 200
-
-    except IntegrityError:
-        db.session.rollback()
-        return respuesta_error(
-            "No fue posible actualizar la configuracion de la sala.",
-            409
-        )
 
 
 # -------------------------------------------------------------------
@@ -710,6 +412,9 @@ def entrar_sala(sala_id):
 
         db.session.commit()
 
+        # Notificar a los participantes de la sala.
+        emitir_actualizacion_sala(sala_id)
+
         return jsonify({
             "ok": True,
             "mensaje": "Te has unido correctamente a la sala.",
@@ -784,7 +489,6 @@ def transferir_anfitrion(sala_id):
                 409
             )
 
-        # Solamente el anfitrion actual puede transferir el rol.
         if sala.anfitrion_id != usuario_id:
             db.session.rollback()
             return respuesta_error(
@@ -808,7 +512,6 @@ def transferir_anfitrion(sala_id):
             for jugador in participaciones
         }
 
-        # Verificar que el nuevo anfitrion pertenezca a la sala.
         if nuevo_anfitrion_id not in ids_participantes:
             db.session.rollback()
             return respuesta_error(
@@ -816,7 +519,6 @@ def transferir_anfitrion(sala_id):
                 404
             )
 
-        # Verificar que el anfitrion actual tambien pertenezca.
         if usuario_id not in ids_participantes:
             db.session.rollback()
             return respuesta_error(
@@ -827,6 +529,9 @@ def transferir_anfitrion(sala_id):
         sala.anfitrion_id = nuevo_anfitrion_id
 
         db.session.commit()
+
+        # Notificar el cambio de anfitrion.
+        emitir_actualizacion_sala(sala_id)
 
         return jsonify({
             "ok": True,
@@ -870,7 +575,6 @@ def salir_sala(sala_id):
                 404
             )
 
-        # La salida durante la partida se coordinara con Persona 5.
         if sala.estado == "en_curso":
             db.session.rollback()
             return respuesta_error(
@@ -909,7 +613,7 @@ def salir_sala(sala_id):
             if jugador.usuario_id != usuario_id
         ]
 
-        # Reiniciar la preparacion de los participantes restantes.
+        # Reiniciar la preparacion de quienes permanecen.
         for jugador in restantes:
             jugador.listo = False
 
@@ -918,20 +622,21 @@ def salir_sala(sala_id):
             for jugador in restantes
         }
 
-        # Si el anfitrion salio, transferir el rol.
-        # Si no queda nadie, establecer NULL.
+        # Transferir el anfitrion si es necesario.
         if sala.anfitrion_id not in ids_restantes:
             sala.anfitrion_id = (
                 restantes[0].usuario_id if restantes else None
             )
 
-        # Actualizar el estado de la sala.
         if not restantes:
             sala.estado = "disponible"
         else:
             sala.estado = "esperando"
 
         db.session.commit()
+
+        # Notificar la salida y los cambios de la sala.
+        emitir_actualizacion_sala(sala_id)
 
         return jsonify({
             "ok": True,
@@ -945,5 +650,305 @@ def salir_sala(sala_id):
         db.session.rollback()
         return respuesta_error(
             "No fue posible completar la salida de la sala.",
+            409
+        )
+
+
+# -------------------------------------------------------------------
+# Actividad 3: Gestion del estado de preparacion
+# -------------------------------------------------------------------
+
+@rooms_bp.route(
+    "/salas/<int:sala_id>/listo",
+    methods=["POST"]
+)
+def actualizar_estado_listo(sala_id):
+
+    usuario_id = obtener_usuario_sesion()
+
+    if usuario_id is None:
+        return respuesta_error(
+            "Debes iniciar sesion.",
+            401
+        )
+
+    datos = request.get_json(silent=True)
+
+    if (
+        not isinstance(datos, dict)
+        or not isinstance(datos.get("listo"), bool)
+    ):
+        return respuesta_error(
+            "Debes indicar si estas listo o no.",
+            400
+        )
+
+    nuevo_estado = datos["listo"]
+
+    try:
+        sala = obtener_sala_bloqueada(sala_id)
+
+        if sala is None:
+            db.session.rollback()
+            return respuesta_error(
+                "La sala no existe.",
+                404
+            )
+
+        if sala.estado == "en_curso":
+            db.session.rollback()
+            return respuesta_error(
+                "La partida ya esta en curso.",
+                409
+            )
+
+        participaciones = obtener_participantes_bloqueados(
+            sala_id
+        )
+
+        participacion_usuario = next(
+            (
+                participacion
+                for participacion in participaciones
+                if participacion.usuario_id == usuario_id
+            ),
+            None
+        )
+
+        if participacion_usuario is None:
+            db.session.rollback()
+            return respuesta_error(
+                "No perteneces a esta sala.",
+                403
+            )
+
+        if len(participaciones) != 2:
+            db.session.rollback()
+            return respuesta_error(
+                "Se necesitan dos jugadores para marcar "
+                "la sala como lista.",
+                409
+            )
+
+        participacion_usuario.listo = nuevo_estado
+
+        todos_listos = all(
+            participacion.listo
+            for participacion in participaciones
+        )
+
+        db.session.commit()
+
+        # Notificar los cambios en la preparacion.
+        emitir_actualizacion_sala(sala_id)
+
+        mensaje = (
+            "Ambos jugadores estan listos. "
+            "La sala esta preparada para comenzar."
+            if todos_listos
+            else "Tu estado de preparacion se actualizo correctamente."
+        )
+
+        return jsonify({
+            "ok": True,
+            "mensaje": mensaje,
+            "listo": nuevo_estado,
+            "todos_listos": todos_listos
+        }), 200
+
+    except IntegrityError:
+        db.session.rollback()
+        return respuesta_error(
+            "No fue posible actualizar el estado de preparacion.",
+            409
+        )
+
+
+# -------------------------------------------------------------------
+# Actividad 4: Seleccion de categoria y dificultad
+# -------------------------------------------------------------------
+
+@rooms_bp.route(
+    "/salas/<int:sala_id>/configuracion",
+    methods=["POST"]
+)
+def actualizar_configuracion(sala_id):
+
+    usuario_id = obtener_usuario_sesion()
+
+    if usuario_id is None:
+        return respuesta_error(
+            "Debes iniciar sesion.",
+            401
+        )
+
+    datos = request.get_json(silent=True)
+
+    if not isinstance(datos, dict):
+        return respuesta_error(
+            "Debes proporcionar la configuracion.",
+            400
+        )
+
+    # Validar el identificador de la categoria.
+    categoria_recibida = datos.get("categoria_id")
+
+    if isinstance(categoria_recibida, bool):
+        return respuesta_error(
+            "El identificador de la categoria no es valido.",
+            400
+        )
+
+    if isinstance(categoria_recibida, int):
+        categoria_id = categoria_recibida
+
+    elif (
+        isinstance(categoria_recibida, str)
+        and categoria_recibida.strip().isdigit()
+    ):
+        categoria_id = int(categoria_recibida.strip())
+
+    else:
+        return respuesta_error(
+            "El identificador de la categoria no es valido.",
+            400
+        )
+
+    dificultad = datos.get("dificultad")
+
+    dificultades_validas = {
+        "facil",
+        "media",
+        "dificil"
+    }
+
+    if (
+        not isinstance(dificultad, str)
+        or dificultad not in dificultades_validas
+    ):
+        return respuesta_error(
+            "La dificultad seleccionada no es valida.",
+            400
+        )
+
+    try:
+        sala = obtener_sala_bloqueada(sala_id)
+
+        if sala is None:
+            db.session.rollback()
+            return respuesta_error(
+                "La sala no existe.",
+                404
+            )
+
+        if sala.estado == "en_curso":
+            db.session.rollback()
+            return respuesta_error(
+                "No puedes modificar una partida que ya esta en curso.",
+                409
+            )
+
+        if sala.anfitrion_id != usuario_id:
+            db.session.rollback()
+            return respuesta_error(
+                "Solamente el anfitrion puede cambiar "
+                "la categoria y dificultad.",
+                403
+            )
+
+        participaciones = obtener_participantes_bloqueados(
+            sala_id
+        )
+
+        anfitrion_pertenece = any(
+            jugador.usuario_id == usuario_id
+            for jugador in participaciones
+        )
+
+        if not anfitrion_pertenece:
+            db.session.rollback()
+            return respuesta_error(
+                "No perteneces a esta sala.",
+                403
+            )
+
+        categoria = db.session.get(
+            Categoria,
+            categoria_id
+        )
+
+        if categoria is None:
+            db.session.rollback()
+            return respuesta_error(
+                "La categoria seleccionada no existe.",
+                404
+            )
+
+        if not categoria.activa:
+            db.session.rollback()
+            return respuesta_error(
+                "La categoria seleccionada no esta disponible.",
+                409
+            )
+
+        cantidad_pares = contar_parejas_categoria(
+            categoria_id
+        )
+
+        dificultades_disponibles = obtener_dificultades(
+            cantidad_pares
+        )
+
+        if not dificultades_disponibles:
+            db.session.rollback()
+            return respuesta_error(
+                "La categoria no tiene suficientes parejas "
+                "para iniciar una partida.",
+                409
+            )
+
+        if dificultad not in dificultades_disponibles:
+            db.session.rollback()
+            return respuesta_error(
+                "La dificultad seleccionada no esta disponible "
+                "para esta categoria.",
+                400
+            )
+
+        # Comprobar si realmente cambio la configuracion.
+        configuracion_modificada = (
+            sala.categoria_id != categoria_id
+            or sala.dificultad != dificultad
+        )
+
+        sala.categoria_id = categoria_id
+        sala.dificultad = dificultad
+
+        # Reiniciar preparacion solamente si hubo cambios.
+        if configuracion_modificada:
+            for jugador in participaciones:
+                jugador.listo = False
+
+        db.session.commit()
+
+        # Notificar un cambio real de configuracion.
+        if configuracion_modificada:
+            emitir_actualizacion_sala(sala_id)
+
+        return jsonify({
+            "ok": True,
+            "mensaje": "La configuracion de la sala se actualizo correctamente.",
+            "categoria_id": categoria.id,
+            "categoria": categoria.nombre,
+            "cantidad_pares": cantidad_pares,
+            "dificultad": dificultad,
+            "dificultades_disponibles": dificultades_disponibles,
+            "configuracion_modificada": configuracion_modificada
+        }), 200
+
+    except IntegrityError:
+        db.session.rollback()
+        return respuesta_error(
+            "No fue posible actualizar la configuracion de la sala.",
             409
         )

@@ -36,6 +36,104 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     // ---------------------------------------------------------------
+    // Conexion de Socket.IO a la sala actual
+    // ---------------------------------------------------------------
+
+    let socketSala = null;
+    let canalSalaUnido = false;
+
+    const lobbyContainer = document.querySelector("[data-sala-id]");
+
+    if (lobbyContainer && typeof io === "function") {
+
+        const salaId = Number(lobbyContainer.dataset.salaId);
+
+        socketSala = io();
+
+        // Al conectarse, solicitar acceso al canal de la sala.
+        socketSala.on("connect", () => {
+
+            canalSalaUnido = false;
+
+            socketSala.emit("unirse_sala", {
+                sala_id: salaId
+            });
+
+        });
+
+        // Confirmacion del servidor.
+        socketSala.on("sala_unida", datos => {
+
+            if (datos.ok) {
+
+                canalSalaUnido = true;
+
+                console.log(
+                    "Conectado al canal de la sala:",
+                    salaId
+                );
+
+            }
+
+        });
+
+        // Recibir actualizaciones de la sala.
+    socketSala.on("sala_actualizada", datos => {
+
+        if (Number(datos.sala_id) !== salaId) {
+            return;
+        }
+
+        const usuarioActual = Number(
+            lobbyContainer.dataset.usuarioId
+        );
+
+        const sigueEnSala = datos.jugadores.some(
+            jugador => Number(jugador.id) === usuarioActual
+        );
+
+        if (!sigueEnSala) {
+            window.location.assign("/salas");
+            return;
+        }
+
+        window.location.reload();
+
+    });
+
+        // Mostrar errores de autorizacion o conexion.
+        socketSala.on("error_sala", datos => {
+
+            const mensaje = document.getElementById(
+                "lobby-message"
+            );
+
+            mostrarMensaje(
+                mensaje,
+                datos.mensaje,
+                true
+            );
+
+        });
+
+        socketSala.on("disconnect", () => {
+            canalSalaUnido = false;
+        });
+
+    }
+
+
+    // Utilidad para actualizar despues de una operacion HTTP.
+    function actualizarVistaDespuesDeOperacion() {
+
+        if (!socketSala || !socketSala.connected || !canalSalaUnido) {
+            actualizarVistaDespuesDeOperacion();
+        }
+
+    }
+
+
+    // ---------------------------------------------------------------
     // Configuracion de categoria y dificultad
     // ---------------------------------------------------------------
 
