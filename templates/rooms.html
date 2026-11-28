@@ -1,0 +1,80 @@
+
+{% extends "base.html" %}
+
+{% block title %}Salas | Memorama PvP{% endblock %}
+
+{% block head %}
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='css/rooms.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<section class="rooms-page">
+
+    <div class="rooms-header">
+        <h1>Salas de juego</h1>
+        <p>
+            Consulta las salas disponibles y únete a una partida.
+        </p>
+    </div>
+
+    {% if salas %}
+
+        <div class="rooms-grid">
+
+            {% for sala in salas %}
+
+                <article class="room-card">
+
+                    <div class="room-card-header">
+
+                        <h2>{{ sala.nombre }}</h2>
+
+                        <span class="room-status estado-{{ sala.estado }}">
+                            {{ sala.estado_texto }}
+                        </span>
+
+                    </div>
+
+                    <div class="room-information">
+
+                        <p>
+                            <strong>Categoría:</strong>
+                            {{ sala.categoria }}
+                        </p>
+
+                        <p>
+                            <strong>Dificultad:</strong>
+                            {{ sala.dificultad }}
+                        </p>
+
+                        <p>
+                            <strong>Jugadores:</strong>
+                            {{ sala.jugadores }}/2
+                        </p>
+
+                        <p>
+                            <strong>Anfitrión:</strong>
+                            {{ sala.anfitrion or "Sin asignar" }}
+                        </p>
+
+                    </div>
+
+                </article>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <p class="empty-rooms">
+            No hay salas registradas actualmente.
+        </p>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

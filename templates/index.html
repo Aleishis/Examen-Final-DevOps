@@ -1,6 +1,14 @@
+
 {% extends "base.html" %}
 
 {% block content %}
-  <h1>Memorama PvP</h1>
-  <p>Encuentra más pares que tu rival.</p>
+
+<h1>Memorama PvP</h1>
+
+<p>Encuentra más pares que tu rival.</p>
+
+<a href="{{ url_for('rooms.listar_salas') }}">
+    Consultar salas
+</a>
+
 {% endblock %}

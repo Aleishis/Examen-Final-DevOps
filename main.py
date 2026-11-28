@@ -29,6 +29,9 @@ migrate = Migrate(app, db)
 
 import models  # noqa: F401
 
+from rooms import rooms_bp
+
+app.register_blueprint(rooms_bp)
 # Un solo proceso (gunicorn -w 1): las salas de Socket.IO viven en memoria.
 socketio = SocketIO(app)
 

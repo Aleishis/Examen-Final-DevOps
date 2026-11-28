@@ -1,0 +1,75 @@
+
+.rooms-page {
+    width: 100%;
+}
+
+.rooms-header {
+    margin-bottom: 25px;
+}
+
+.rooms-header h1 {
+    margin-bottom: 8px;
+}
+
+.rooms-header p {
+    color: #666;
+}
+
+.rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.room-card {
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background-color: #fff;
+}
+
+.room-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.room-card-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.room-information p {
+    margin: 10px 0;
+}
+
+.room-status {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.estado-disponible {
+    color: #166534;
+    background-color: #dcfce7;
+}
+
+.estado-esperando {
+    color: #92400e;
+    background-color: #fef3c7;
+}
+
+.estado-en_curso {
+    color: #1e40af;
+    background-color: #dbeafe;
+}
+
+.empty-rooms {
+    padding: 20px;
+    text-align: center;
+}
