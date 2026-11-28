@@ -143,6 +143,70 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     // ---------------------------------------------------------------
+    // Actualizacion del estado de preparacion
+    // ---------------------------------------------------------------
+
+    const readyButton = document.getElementById("toggle-ready");
+
+    if (readyButton) {
+
+        readyButton.addEventListener("click", async () => {
+
+            const mensaje = document.getElementById("lobby-message");
+
+            // Obtener el estado actual del jugador.
+            const estadoActual =
+                readyButton.dataset.currentReady === "true";
+
+            // Invertir el estado actual.
+            const nuevoEstado = !estadoActual;
+
+            readyButton.disabled = true;
+
+            try {
+
+                const response = await fetch(
+                    readyButton.dataset.readyUrl,
+                    {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        body: JSON.stringify({
+                            listo: nuevoEstado
+                        })
+                    }
+                );
+
+                const datos = await leerRespuesta(response);
+
+                mostrarMensaje(
+                    mensaje,
+                    datos.mensaje,
+                    false
+                );
+
+                // Actualizar la pantalla para mostrar los cambios.
+                window.location.reload();
+
+            } catch (error) {
+
+                mostrarMensaje(
+                    mensaje,
+                    error.message,
+                    true
+                );
+
+                readyButton.disabled = false;
+            }
+
+        });
+
+    }
+
+    // ---------------------------------------------------------------
     // Salida de una sala
     // ---------------------------------------------------------------
 

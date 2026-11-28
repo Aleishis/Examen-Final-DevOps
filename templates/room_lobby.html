@@ -65,6 +65,16 @@
                         <span class="participant-label">Participante</span>
                     {% endif %}
 
+                    {% if jugador.listo %}
+                        <span class="ready-status ready">
+                            Listo
+                        </span>
+                    {% else %}
+                        <span class="ready-status not-ready">
+                            No esta listo
+                        </span>
+                    {% endif %}
+
                 </div>
 
                 {% if es_anfitrion and jugador.id != usuario_id %}
@@ -96,8 +106,51 @@
 
     </div>
 
+
+    {% if todos_listos %}
+
+    <div class="ready-summary">
+        <strong>¡Ambos jugadores estan listos!</strong>
+        <p>La sala esta preparada para comenzar la partida.</p>
+    </div>
+
+{% elif jugadores|length == 2 %}
+
+    <div class="waiting-ready">
+        Esperando a que ambos jugadores esten listos...
+    </div>
+
+{% else %}
+
+    <div class="waiting-ready">
+        Se necesitan dos jugadores para comenzar.
+    </div>
+
+{% endif %}
+
     <div class="lobby-actions">
 
+        {% if sala.estado != "en_curso" and jugadores|length == 2 %}
+
+    <button
+        type="button"
+        class="room-button"
+        id="toggle-ready"
+        data-ready-url="{{ url_for(
+            'rooms.actualizar_estado_listo',
+            sala_id=sala.id
+        ) }}"
+        data-current-ready="{{ 'true' if mi_estado_listo else 'false' }}">
+
+        {% if mi_estado_listo %}
+            Cancelar preparacion
+        {% else %}
+            Marcarme como listo
+        {% endif %}
+
+    </button>
+
+{% endif %}
         <button
             type="button"
             class="leave-button"

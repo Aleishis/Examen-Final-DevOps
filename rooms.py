@@ -8,6 +8,7 @@ from flask import (
     redirect,
     url_for
 )
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -59,6 +60,21 @@ def obtener_sala_bloqueada(sala_id):
     )
 
     return db.session.execute(consulta).scalar_one_or_none()
+
+
+def obtener_participantes_bloqueados(sala_id):
+    """
+    Obtiene los participantes de una sala y bloquea sus registros
+    durante la transaccion.
+    """
+    consulta = (
+        select(SalaJugador)
+        .where(SalaJugador.sala_id == sala_id)
+        .order_by(SalaJugador.id.asc())
+        .with_for_update()
+    )
+
+    return db.session.execute(consulta).scalars().all()
 
 
 # -------------------------------------------------------------------
@@ -197,6 +213,22 @@ def ver_sala(sala_id):
             "listo": participacion.listo
         })
 
+    # Comprobar si los dos jugadores estan preparados.
+    todos_listos = (
+        len(participaciones) == 2
+        and all(
+            participacion.listo
+            for participacion, usuario in participaciones
+        )
+    )
+
+    # Consultar el estado de preparacion del usuario actual.
+    mi_estado_listo = any(
+        participacion.usuario_id == usuario_id
+        and participacion.listo
+        for participacion, usuario in participaciones
+    )
+
     # Obtener la categoria de la sala.
     categoria = db.session.get(Categoria, sala.categoria_id)
 
@@ -206,7 +238,9 @@ def ver_sala(sala_id):
         categoria=categoria,
         jugadores=jugadores,
         usuario_id=usuario_id,
-        es_anfitrion=(sala.anfitrion_id == usuario_id)
+        es_anfitrion=(sala.anfitrion_id == usuario_id),
+        todos_listos=todos_listos,
+        mi_estado_listo=mi_estado_listo
     )
 
 
@@ -249,21 +283,22 @@ def entrar_sala(sala_id):
                 401
             )
 
+        # Obtener los participantes actuales.
+        participaciones = obtener_participantes_bloqueados(
+            sala_id
+        )
+
         # Comprobar si el usuario ya pertenece a esta sala.
-        participacion = db.session.execute(
-            select(SalaJugador).where(
-                SalaJugador.sala_id == sala_id,
-                SalaJugador.usuario_id == usuario_id
-            )
-        ).scalar_one_or_none()
+        participacion_existente = next(
+            (
+                participacion
+                for participacion in participaciones
+                if participacion.usuario_id == usuario_id
+            ),
+            None
+        )
 
-        if participacion is not None:
-            cantidad = db.session.scalar(
-                select(func.count(SalaJugador.id)).where(
-                    SalaJugador.sala_id == sala_id
-                )
-            )
-
+        if participacion_existente is not None:
             db.session.commit()
 
             return jsonify({
@@ -271,7 +306,7 @@ def entrar_sala(sala_id):
                 "mensaje": "Ya perteneces a esta sala.",
                 "sala_id": sala_id,
                 "anfitrion_id": sala.anfitrion_id,
-                "jugadores": cantidad
+                "jugadores": len(participaciones)
             }), 200
 
         # No permitir entradas cuando la partida ya comenzo.
@@ -282,29 +317,27 @@ def entrar_sala(sala_id):
                 409
             )
 
-        # Contar los participantes actuales.
-        cantidad = db.session.scalar(
-            select(func.count(SalaJugador.id)).where(
-                SalaJugador.sala_id == sala_id
-            )
-        )
-
         # Impedir que ingresen mas de dos jugadores.
-        if cantidad >= 2:
+        if len(participaciones) >= 2:
             db.session.rollback()
             return respuesta_error(
                 "La sala ya tiene dos jugadores.",
                 409
             )
 
-        # Registrar al jugador.
-        participacion = SalaJugador(
+        # Reiniciar la preparacion de los jugadores anteriores.
+        # La composicion de la sala esta cambiando.
+        for jugador in participaciones:
+            jugador.listo = False
+
+        # Registrar al nuevo jugador.
+        nueva_participacion = SalaJugador(
             sala_id=sala_id,
             usuario_id=usuario_id,
             listo=False
         )
 
-        db.session.add(participacion)
+        db.session.add(nueva_participacion)
 
         # El primer jugador se convierte en anfitrion.
         if sala.anfitrion_id is None:
@@ -320,7 +353,7 @@ def entrar_sala(sala_id):
             "mensaje": "Te has unido correctamente a la sala.",
             "sala_id": sala_id,
             "anfitrion_id": sala.anfitrion_id,
-            "jugadores": cantidad + 1
+            "jugadores": len(participaciones) + 1
         }), 201
 
     except IntegrityError:
@@ -480,24 +513,21 @@ def salir_sala(sala_id):
 
         # Eliminar la participacion del jugador.
         db.session.delete(participacion)
-
-        # Asegurar que la eliminacion se refleje antes de consultar.
         db.session.flush()
 
         # Obtener los jugadores restantes.
-        restantes = db.session.execute(
-            select(SalaJugador)
-            .where(SalaJugador.sala_id == sala_id)
-            .order_by(
-                SalaJugador.fecha_union.asc(),
-                SalaJugador.id.asc()
-            )
-        ).scalars().all()
+        restantes = obtener_participantes_bloqueados(
+            sala_id
+        )
 
         ids_restantes = [
             jugador.usuario_id
             for jugador in restantes
         ]
+
+        # Reiniciar la preparacion de quienes permanecen.
+        for jugador in restantes:
+            jugador.listo = False
 
         # Si el anfitrion salio, asignar el rol al jugador restante.
         # Si no queda ninguno, el anfitrion pasa a ser NULL.
@@ -526,5 +556,120 @@ def salir_sala(sala_id):
         db.session.rollback()
         return respuesta_error(
             "No fue posible completar la salida de la sala.",
+            409
+        )
+
+
+# -------------------------------------------------------------------
+# Actividad 3: Gestion del estado de preparacion
+# -------------------------------------------------------------------
+
+@rooms_bp.route(
+    "/salas/<int:sala_id>/listo",
+    methods=["POST"]
+)
+def actualizar_estado_listo(sala_id):
+
+    usuario_id = obtener_usuario_sesion()
+
+    if usuario_id is None:
+        return respuesta_error(
+            "Debes iniciar sesion.",
+            401
+        )
+
+    datos = request.get_json(silent=True)
+
+    # Validar que se envie un valor booleano.
+    if (
+        not isinstance(datos, dict)
+        or not isinstance(datos.get("listo"), bool)
+    ):
+        return respuesta_error(
+            "Debes indicar si estas listo o no.",
+            400
+        )
+
+    nuevo_estado = datos["listo"]
+
+    try:
+        # Bloquear la sala durante la operacion.
+        sala = obtener_sala_bloqueada(sala_id)
+
+        if sala is None:
+            db.session.rollback()
+            return respuesta_error(
+                "La sala no existe.",
+                404
+            )
+
+        # No permitir modificaciones durante una partida.
+        if sala.estado == "en_curso":
+            db.session.rollback()
+            return respuesta_error(
+                "La partida ya esta en curso.",
+                409
+            )
+
+        # Obtener y bloquear los participantes.
+        participaciones = obtener_participantes_bloqueados(
+            sala_id
+        )
+
+        # Verificar que el usuario pertenezca a la sala.
+        participacion_usuario = next(
+            (
+                participacion
+                for participacion in participaciones
+                if participacion.usuario_id == usuario_id
+            ),
+            None
+        )
+
+        if participacion_usuario is None:
+            db.session.rollback()
+            return respuesta_error(
+                "No perteneces a esta sala.",
+                403
+            )
+
+        # Se necesitan exactamente dos jugadores.
+        if len(participaciones) != 2:
+            db.session.rollback()
+            return respuesta_error(
+                "Se necesitan dos jugadores para marcar "
+                "la sala como lista.",
+                409
+            )
+
+        # Actualizar el estado individual del jugador.
+        participacion_usuario.listo = nuevo_estado
+
+        # Comprobar si ambos jugadores estan preparados.
+        todos_listos = all(
+            participacion.listo
+            for participacion in participaciones
+        )
+
+        db.session.commit()
+
+        mensaje = (
+            "Ambos jugadores estan listos. "
+            "La sala esta preparada para comenzar."
+            if todos_listos
+            else "Tu estado de preparacion se actualizo correctamente."
+        )
+
+        return jsonify({
+            "ok": True,
+            "mensaje": mensaje,
+            "listo": nuevo_estado,
+            "todos_listos": todos_listos
+        }), 200
+
+    except IntegrityError:
+        db.session.rollback()
+        return respuesta_error(
+            "No fue posible actualizar el estado de preparacion.",
             409
         )

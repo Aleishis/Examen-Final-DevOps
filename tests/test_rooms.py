@@ -342,3 +342,179 @@ def test_usuario_ajeno_no_puede_ver_sala(client):
 
     assert respuesta.status_code == 302
     assert respuesta.headers["Location"].endswith("/salas")
+
+
+# -------------------------------------------------------------------
+# Prueba 9: Ambos jugadores pueden marcarse como listos
+# -------------------------------------------------------------------
+
+def test_dos_jugadores_pueden_marcarse_listos(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+    segundo_jugador = usuarios[1]
+
+    # Ambos jugadores entran a la sala.
+    autenticar(client, primer_jugador)
+    entrada1 = client.post(f"/salas/{sala_id}/entrar")
+    assert entrada1.status_code == 201
+
+    autenticar(client, segundo_jugador)
+    entrada2 = client.post(f"/salas/{sala_id}/entrar")
+    assert entrada2.status_code == 201
+
+    # El primer jugador se marca como listo.
+    autenticar(client, primer_jugador)
+
+    respuesta1 = client.post(
+        f"/salas/{sala_id}/listo",
+        json={"listo": True}
+    )
+
+    assert respuesta1.status_code == 200
+    assert respuesta1.get_json()["listo"] is True
+    assert respuesta1.get_json()["todos_listos"] is False
+
+    # El segundo jugador se marca como listo.
+    autenticar(client, segundo_jugador)
+
+    respuesta2 = client.post(
+        f"/salas/{sala_id}/listo",
+        json={"listo": True}
+    )
+
+    assert respuesta2.status_code == 200
+    assert respuesta2.get_json()["todos_listos"] is True
+
+    # Comprobar los estados individuales en la base de datos.
+    participaciones = SalaJugador.query.filter_by(
+        sala_id=sala_id
+    ).all()
+
+    assert len(participaciones) == 2
+    assert all(jugador.listo for jugador in participaciones)
+
+    # Persona 5 sera responsable de iniciar la partida.
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.estado == "esperando"
+
+
+# -------------------------------------------------------------------
+# Prueba 10: Un jugador puede cancelar su preparacion
+# -------------------------------------------------------------------
+
+def test_jugador_puede_cancelar_su_estado_listo(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+    segundo_jugador = usuarios[1]
+
+    # Ambos jugadores entran.
+    autenticar(client, primer_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    autenticar(client, segundo_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    # El primer jugador se marca como listo.
+    autenticar(client, primer_jugador)
+
+    client.post(
+        f"/salas/{sala_id}/listo",
+        json={"listo": True}
+    )
+
+    # El mismo jugador cancela su preparacion.
+    respuesta = client.post(
+        f"/salas/{sala_id}/listo",
+        json={"listo": False}
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json()["listo"] is False
+    assert respuesta.get_json()["todos_listos"] is False
+
+    participacion = SalaJugador.query.filter_by(
+        sala_id=sala_id,
+        usuario_id=primer_jugador
+    ).first()
+
+    assert participacion.listo is False
+
+
+# -------------------------------------------------------------------
+# Prueba 11: No se puede marcar listo con un solo jugador
+# -------------------------------------------------------------------
+
+def test_no_se_puede_marcar_listo_con_un_solo_jugador(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+
+    autenticar(client, primer_jugador)
+
+    entrada = client.post(
+        f"/salas/{sala_id}/entrar"
+    )
+
+    assert entrada.status_code == 201
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/listo",
+        json={"listo": True}
+    )
+
+    assert respuesta.status_code == 409
+
+    participacion = SalaJugador.query.filter_by(
+        sala_id=sala_id,
+        usuario_id=primer_jugador
+    ).first()
+
+    assert participacion.listo is False
+
+
+# -------------------------------------------------------------------
+# Prueba 12: Un usuario ajeno no puede cambiar el estado
+# -------------------------------------------------------------------
+
+def test_usuario_ajeno_no_puede_modificar_estado_listo(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+    segundo_jugador = usuarios[1]
+    usuario_ajeno = usuarios[2]
+
+    # Los dos participantes ingresan.
+    autenticar(client, primer_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    autenticar(client, segundo_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    # Un tercer usuario intenta modificar la preparacion.
+    autenticar(client, usuario_ajeno)
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/listo",
+        json={"listo": True}
+    )
+
+    assert respuesta.status_code == 403
+
+    # Comprobar que los estados no fueron modificados.
+    participaciones = SalaJugador.query.filter_by(
+        sala_id=sala_id
+    ).all()
+
+    assert len(participaciones) == 2
+    assert all(
+        not jugador.listo
+        for jugador in participaciones
+    )
+
