@@ -88,9 +88,19 @@
         </div>
     </form>
 
+<form
+    id="form-eliminar-categorias"
+    method="POST"
+    action="{{ url_for('categories.delete_selected') }}"
+>
     <div class="acciones" style="margin-bottom: 18px;">
-        <span>Selecciona las categorías que quieras administrar.</span>
-        <button class="boton-eliminar" type="button" disabled>
+        <span>Selecciona las categorías que quieras eliminar.</span>
+
+        <button
+            class="boton boton-eliminar"
+            type="submit"
+            disabled
+        >
             Borrar categorías (0)
         </button>
     </div>
@@ -110,6 +120,7 @@
                             <input
                                 type="checkbox"
                                 class="seleccion-categoria"
+                                name="categoria_ids"
                                 value="{{ categoria.id }}"
                             >
                             Seleccionar
@@ -131,7 +142,7 @@
                     {% endif %}
 
                     <div class="contenido">
-                        <h2>{{ categoria.nombre }}</h2>
+                        <h2 class="nombre-categoria">{{ categoria.nombre }}</h2>
                         <p>Parejas: {{ categoria.cantidad_parejas }} / 50</p>
 
                         <div class="dificultades">
@@ -158,7 +169,20 @@
         </div>
     {% endif %}
 
+</form>
+
 </div>
+
+{% with mensajes = get_flashed_messages() %}
+    {% if mensajes %}
+        <div class="mensajes">
+            {% for mensaje in mensajes %}
+                <p>{{ mensaje }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
 <script src="{{ url_for('static', filename='js/categories/categories.js') }}" defer></script>
 </body>
 </html>

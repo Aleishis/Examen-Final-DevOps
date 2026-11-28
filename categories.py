@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 
 from flask import (
     Blueprint,
@@ -8,6 +9,7 @@ from flask import (
     render_template,
     request,
     url_for,
+    flash
 )
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -169,6 +171,108 @@ def index():
     )
 
 
+# Delete selected categories
+@categories_bp.route("/eliminar", methods=["POST"])
+def delete_selected():
+    selected_ids = request.form.getlist("categoria_ids")
+
+    if not selected_ids:
+        flash("Selecciona al menos una categoría para eliminar.")
+        return redirect(url_for("categories.index"))
+
+    # Validar los identificadores recibidos.
+    try:
+        category_ids = list(dict.fromkeys(
+            int(value) for value in selected_ids
+        ))
+
+        if any(category_id <= 0 for category_id in category_ids):
+            raise ValueError
+
+    except (ValueError, TypeError):
+        flash("La selección de categorías no es válida.")
+        return redirect(url_for("categories.index"))
+
+    categories = Categoria.query.filter(
+        Categoria.id.in_(category_ids)
+    ).all()
+
+    if len(categories) != len(category_ids):
+        flash(
+            "Una o más categorías ya no existen. "
+            "Actualiza el listado e inténtalo de nuevo."
+        )
+        return redirect(url_for("categories.index"))
+
+    # Guardar las rutas de las imágenes para limpiarlas después
+    # de confirmar la eliminación en la base de datos.
+    image_paths = set()
+
+    try:
+        for category in categories:
+            pairs = ParejaCarta.query.filter_by(
+                categoria_id=category.id
+            ).all()
+
+            for pair in pairs:
+                if pair.imagen:
+                    image_paths.add(pair.imagen)
+
+            # Primero quitar la referencia de la portada.
+            category.portada_id = None
+
+        # Aplicar el cambio de portada antes de eliminar las tarjetas.
+        db.session.flush()
+
+        # Eliminar primero todas las tarjetas de las categorías seleccionadas.
+        for category in categories:
+            pairs = ParejaCarta.query.filter_by(
+                categoria_id=category.id
+            ).all()
+
+            for pair in pairs:
+                db.session.delete(pair)
+
+        # Aplicar la eliminación de las tarjetas antes de borrar las categorías.
+        db.session.flush()
+
+        # Ahora que las tarjetas ya fueron eliminadas, borrar las categorías.
+        for category in categories:
+            db.session.delete(category)
+
+        db.session.commit()
+
+    except Exception:
+        db.session.rollback()
+
+        current_app.logger.exception(
+            "Error al eliminar las categorías seleccionadas."
+        )
+
+        flash(
+            "No se pudieron eliminar las categorías. "
+            "No se guardaron los cambios."
+        )
+        return redirect(url_for("categories.index"))
+
+    # La eliminación en la base de datos ya se confirmó.
+    # Solo borrar archivos que ninguna tarjeta siga utilizando.
+    for image_path in image_paths:
+        try:
+            remove_unused_image(image_path)
+        except OSError:
+            current_app.logger.exception(
+                "No se pudo eliminar la imagen: %s",
+                image_path,
+            )
+
+    flash(
+        f"Se eliminaron {len(categories)} categoría(s) correctamente."
+    )
+
+    return redirect(url_for("categories.index"))
+
+
 # Show category details
 @categories_bp.route("/<int:categoria_id>")
 def form(categoria_id):
@@ -204,36 +308,12 @@ def form(categoria_id):
         dificultades=difficulties,
         error=None,
     )
+
+
 # Create a category
 @categories_bp.route("/nueva", methods=["GET", "POST"])
 def create():
-    if request.method == "GET":
-        return render_template(
-            "categories/form.html",
-            modo="crear",
-            categoria=None,
-            parejas=[],
-            portada=None,
-            cantidad_parejas=0,
-            dificultades={
-                "facil": False,
-                "media": False,
-                "dificil": False,
-            },
-            error=None,
-        )
-
-    name = request.form.get("nombre", "").strip()
-    active = request.form.get("activa") == "on"
-
-    if not name:
-        error = "Escribe el nombre de la categoría."
-    elif len(name) > 100:
-        error = "El nombre no puede superar los 100 caracteres."
-    else:
-        error = None
-
-    if error:
+    def render_create_page(error=None, status=200):
         return render_template(
             "categories/form.html",
             modo="crear",
@@ -247,35 +327,184 @@ def create():
                 "dificil": False,
             },
             error=error,
-        ), 400
+        ), status
 
-    category = Categoria(nombre=name, activa=active)
-    db.session.add(category)
+    if request.method == "GET":
+        return render_create_page()
+
+    # Obtener y validar el nombre de la categoría.
+    name = request.form.get("nombre", "").strip()
+
+    if not name:
+        return render_create_page(
+            "Escribe el nombre de la categoría.", 400
+        )
+
+    if len(name) > 100:
+        return render_create_page(
+            "El nombre no puede superar los 100 caracteres.", 400
+        )
+
+    # Obtener los archivos seleccionados.
+    files = [
+        file
+        for file in request.files.getlist("imagenes_tarjetas")
+        if file and file.filename
+    ]
+
+    if len(files) > 50:
+        return render_create_page(
+            "No puedes agregar más de 50 tarjetas.", 400
+        )
+
+    # Leer los nombres y la portada enviados desde JavaScript.
+    try:
+        metadata = json.loads(
+            request.form.get("tarjetas_metadata", "")
+        )
+
+        tarjetas_metadata = metadata["tarjetas"]
+        portada_index = metadata["portada_index"]
+
+        if not isinstance(tarjetas_metadata, list):
+            raise ValueError("La lista de tarjetas no es válida.")
+
+        if len(tarjetas_metadata) != len(files):
+            raise ValueError(
+                "La cantidad de imágenes no coincide con las tarjetas."
+            )
+
+        if portada_index is not None:
+            if (
+                not isinstance(portada_index, int)
+                or isinstance(portada_index, bool)
+                or not 0 <= portada_index < len(files)
+            ):
+                raise ValueError(
+                    "La portada seleccionada no es válida."
+                )
+
+        nombres = []
+
+        for tarjeta in tarjetas_metadata:
+            if not isinstance(tarjeta, dict):
+                raise ValueError(
+                    "Los datos de una tarjeta no son válidos."
+                )
+
+            nombre = tarjeta.get("nombre")
+
+            if not isinstance(nombre, str):
+                raise ValueError(
+                    "El nombre de una tarjeta no es válido."
+                )
+
+            nombre = nombre.strip()
+
+            if not nombre:
+                raise ValueError(
+                    "Todas las tarjetas deben tener un nombre."
+                )
+
+            if len(nombre) > 100:
+                raise ValueError(
+                    "Los nombres de las tarjetas no pueden superar "
+                    "los 100 caracteres."
+                )
+
+            nombres.append(nombre)
+
+    except (ValueError, TypeError, KeyError):
+        return render_create_page(
+            "Los datos de las tarjetas no son válidos. "
+            "Revisa las imágenes y sus nombres.", 400
+        )
+
+    # Archivos guardados durante esta operación.
+    saved_paths = []
 
     try:
+        # Crear la categoría dentro de la transacción.
+        # Se activa únicamente si hay al menos 9 tarjetas.
+        category = Categoria(
+            nombre=name,
+            activa=len(files) >= 9,
+        )
+
+        db.session.add(category)
+
+        # Obtener el ID de la categoría sin confirmar la transacción.
+        db.session.flush()
+
+        # Guardar las imágenes y crear todas las tarjetas.
+        parejas = []
+
+        for file, nombre in zip(files, nombres):
+            image_path = save_uploaded_image(file)
+            saved_paths.append(image_path)
+
+            pair = ParejaCarta(
+                categoria_id=category.id,
+                nombre=nombre,
+                imagen=image_path,
+            )
+
+            db.session.add(pair)
+            parejas.append(pair)
+
+        # Obtener los IDs de las tarjetas antes de asignar la portada.
+        db.session.flush()
+
+        if portada_index is not None:
+            portada = parejas[portada_index]
+            category.portada_id = portada.id
+
+        # Guardar categoría, tarjetas y portada en una sola transacción.
         db.session.commit()
+
     except IntegrityError:
         db.session.rollback()
 
-        return render_template(
-            "categories/form.html",
-            modo="crear",
-            categoria=None,
-            parejas=[],
-            portada=None,
-            cantidad_parejas=0,
-            dificultades={
-                "facil": False,
-                "media": False,
-                "dificil": False,
-            },
-            error="Ya existe una categoría con ese nombre.",
-        ), 400
+        for image_path in saved_paths:
+            remove_unused_image(image_path)
 
+        return render_create_page(
+            "Ya existe una categoría con ese nombre.", 400
+        )
+
+    except ValueError as exc:
+        db.session.rollback()
+
+        for image_path in saved_paths:
+            remove_unused_image(image_path)
+
+        return render_create_page(str(exc), 400)
+
+    except Exception:
+        db.session.rollback()
+
+        for image_path in saved_paths:
+            try:
+                remove_unused_image(image_path)
+            except OSError:
+                current_app.logger.exception(
+                    "No se pudo limpiar una imagen: %s",
+                    image_path,
+                )
+
+        current_app.logger.exception(
+            "Error al crear la categoría y sus tarjetas."
+        )
+
+        return render_create_page(
+            "No se pudo crear la categoría. "
+            "Revisa los datos e inténtalo de nuevo.", 500
+        )
+
+    # Abrir la categoría creada para revisar o editar sus tarjetas.
     return redirect(
         url_for("categories.edit", categoria_id=category.id)
     )
-
 
 @categories_bp.route("/<int:categoria_id>/editar", methods=["GET", "POST"])
 def edit(categoria_id):
@@ -288,6 +517,14 @@ def edit(categoria_id):
         if action == "save_details":
             name = request.form.get("nombre", "").strip()
             active = request.form.get("activa") == "on"
+
+            count = ParejaCarta.query.filter_by(
+                categoria_id=category.id
+            ).count()
+
+            # No permitir activar categorías sin dificultades disponibles
+            if count < 9:
+                active = False
 
             if not name:
                 return render_edit_page(
@@ -348,52 +585,66 @@ def edit(categoria_id):
                     category, "No se pudo cambiar la portada."
                 ), 500
 
-        # Add one card
+        
+        # Add multiple cards
         elif action == "add_pair":
-            name = request.form.get("nombre_tarjeta", "").strip()
-            file = request.files.get("imagen_tarjeta")
+            files = request.files.getlist("imagenes_tarjetas")
+
+            # Ignorar archivos vacíos
+            files = [file for file in files if file and file.filename]
+
+            if not files:
+                return render_edit_page(
+                    category, "Selecciona al menos una imagen."
+                ), 400
 
             current_count = ParejaCarta.query.filter_by(
                 categoria_id=category.id
             ).count()
 
-            if current_count >= 50:
+            if current_count + len(files) > 50:
                 return render_edit_page(
-                    category, "No puedes agregar más de 50 tarjetas."
+                    category,
+                    f"Solo puedes agregar {50 - current_count} "
+                    "tarjetas más a esta categoría."
                 ), 400
 
-            if not name:
-                return render_edit_page(
-                    category, "Escribe el nombre de la tarjeta."
-                ), 400
-
-            if len(name) > 100:
-                return render_edit_page(
-                    category, "El nombre de la tarjeta no puede superar los 100 caracteres."
-                ), 400
-
-            if not file or not file.filename:
-                return render_edit_page(
-                    category, "Selecciona una imagen."
-                ), 400
-
-            image_path = None
+            saved_paths = []
 
             try:
-                image_path = save_uploaded_image(file)
+                for file in files:
+                    # Obtener el nombre del archivo sin su extensión
+                    name = secure_filename(file.filename)
+                    name = os.path.splitext(name)[0].strip()
 
-                pair = ParejaCarta(
-                    categoria_id=category.id,
-                    nombre=name,
-                    imagen=image_path,
-                )
-                db.session.add(pair)
+                    if not name:
+                        raise ValueError(
+                            "Uno de los archivos no tiene un nombre válido."
+                        )
+
+                    if len(name) > 100:
+                        raise ValueError(
+                            f"El nombre del archivo '{name}' "
+                            "supera los 100 caracteres."
+                        )
+
+                    image_path = save_uploaded_image(file)
+                    saved_paths.append(image_path)
+
+                    pair = ParejaCarta(
+                        categoria_id=category.id,
+                        nombre=name,
+                        imagen=image_path,
+                    )
+
+                    db.session.add(pair)
+
                 db.session.commit()
 
             except ValueError as exc:
                 db.session.rollback()
 
-                if image_path:
+                for image_path in saved_paths:
                     remove_unused_image(image_path)
 
                 return render_edit_page(category, str(exc)), 400
@@ -401,14 +652,17 @@ def edit(categoria_id):
             except Exception:
                 db.session.rollback()
 
-                if image_path:
+                for image_path in saved_paths:
                     remove_unused_image(image_path)
 
-                current_app.logger.exception("Error al agregar la tarjeta")
+                current_app.logger.exception(
+                    "Error al agregar las tarjetas"
+                )
 
                 return render_edit_page(
-                    category, "No se pudo agregar la tarjeta."
+                    category, "No se pudieron agregar las tarjetas."
                 ), 500
+
 
 
         # Rename one card

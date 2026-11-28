@@ -47,14 +47,18 @@
         </div>
     {% endif %}
 
+ 
     {% if modo == "crear" %}
 
-        <section class="detalle-resumen">
-            <div class="detalle-info">
-                <h2>Información de la categoría</h2>
-
-                <form method="POST"
-                      action="{{ url_for('categories.create') }}">
+        <form
+            id="form-crear-categoria"
+            method="POST"
+            enctype="multipart/form-data"
+            action="{{ url_for('categories.create') }}"
+        >
+            <section class="detalle-resumen">
+                <div class="detalle-info">
+                    <h2>Información de la categoría</h2>
 
                     <label for="nombre">Nombre de la categoría</label>
                     <input
@@ -65,24 +69,75 @@
                         required
                     >
 
-                    <label>
-                        <input type="checkbox" name="activa" checked>
-                        Categoría activa
-                    </label>
-
                     <p>
-                        Después de crearla podrás agregar sus tarjetas
-                        individualmente.
+                        La categoría se activará automáticamente cuando
+                        tenga al menos una dificultad disponible.
+                    </p>
+                </div>
+            </section>
+
+            <section class="detalle-resumen">
+                <div class="detalle-info">
+                    <h2>Agregar tarjetas</h2>
+                    <p>
+                        Selecciona varias imágenes. Podrás cambiar sus
+                        nombres, elegir la portada y quitar tarjetas
+                        antes de crear la categoría.
                     </p>
 
-                    <button type="submit" class="boton">
-                        Crear categoría
-                    </button>
-                </form>
-            </div>
-        </section>
+                    <label for="imagenes-tarjetas">
+                        Imágenes de las tarjetas
+                    </label>
+
+                    <input
+                        id="imagenes-tarjetas"
+                        type="file"
+                        name="imagenes_tarjetas"
+                        accept=".png,.jpg,.jpeg,.webp,.gif"
+                        multiple
+                    >
+
+                    <p>
+                        Máximo 50 tarjetas por categoría.
+                    </p>
+                </div>
+            </section>
+
+            <section class="detalle-resumen">
+                <div class="detalle-info">
+                    <h2>Vista previa de las tarjetas</h2>
+
+                    <p>
+                        Tarjetas seleccionadas:
+                        <strong id="contador-tarjetas-nuevas">0</strong>
+                        / 50
+                    </p>
+
+                    <div
+                        id="rejilla-tarjetas-nuevas"
+                        class="parejas-rejilla"
+                    ></div>
+
+                    <p id="mensaje-tarjetas-nuevas" aria-live="polite">
+                        Todavía no has seleccionado imágenes.
+                    </p>
+                </div>
+            </section>
+
+            <input
+                type="hidden"
+                id="tarjetas-metadata"
+                name="tarjetas_metadata"
+                value="[]"
+            >
+
+            <button type="submit" class="boton">
+                Crear categoría
+            </button>
+        </form>
 
     {% else %}
+
 
         <section class="detalle-resumen">
 
@@ -179,7 +234,7 @@
                             class="boton"
                             href="{{ url_for('categories.form', categoria_id=categoria.id) }}"
                         >
-                            Cancelar edición
+                            Salir de modo edición
                         </a>
                     {% endif %}
                 </div>
@@ -193,6 +248,45 @@
 
        
             <section>
+
+                                            {% if modo == "editar" %}
+                <section class="detalle-resumen">
+                    <div class="detalle-info">
+                        <h2>Agregar tarjeta</h2>
+                        <p>Selecciona una imagen y escribe el nombre de la tarjeta.</p>
+
+                        {% if cantidad_parejas < 50 %}
+
+                            <form
+                                method="POST"
+                                enctype="multipart/form-data"
+                                action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                            >
+                                <input type="hidden" name="action" value="add_pair">
+
+                                <label for="imagen_tarjeta">Imágenes de las tarjetas</label>
+                                <input
+                                    id="imagen_tarjeta"
+                                    type="file"
+                                    name="imagenes_tarjetas"
+                                    accept=".png,.jpg,.jpeg,.webp,.gif"
+                                    multiple
+                                    required
+                                >
+
+                                <button type="submit" class="boton">
+                                    Agregar tarjetas
+                                </button>
+                            </form>
+
+                        {% else %}
+                            <p>La categoría ya alcanzó el límite de 50 tarjetas.</p>
+                        {% endif %}
+                    </div>
+                </section>
+
+            {% endif %}
+
                 <h2>Tarjetas de la categoría</h2>
 
                 <p>
@@ -203,6 +297,8 @@
                         Estas son las {{ cantidad_parejas }} tarjetas registradas.
                     {% endif %}
                 </p>
+
+
 
                 {% if modo == "editar" %}
 
@@ -313,7 +409,7 @@
                                         </div>
 
                                 {% else %}
-                                    <h3>{{ pareja.nombre }}</h3>
+                                    <h3 class="nombre-pareja">{{ pareja.nombre }}</h3>
                                 {% endif %}
 
                             </article>
@@ -326,49 +422,7 @@
                 {% endif %}
             </section>
 
-            {% if modo == "editar" %}
-                <section class="detalle-resumen">
-                    <div class="detalle-info">
-                        <h2>Agregar tarjeta</h2>
-                        <p>Selecciona una imagen y escribe el nombre de la tarjeta.</p>
 
-                        {% if cantidad_parejas < 50 %}
-                            <form
-                                method="POST"
-                                enctype="multipart/form-data"
-                                action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
-                            >
-                                <input type="hidden" name="action" value="add_pair">
-
-                                <label for="nombre_tarjeta">Nombre de la tarjeta</label>
-                                <input
-                                    id="nombre_tarjeta"
-                                    type="text"
-                                    name="nombre_tarjeta"
-                                    maxlength="100"
-                                    required
-                                >
-
-                                <label for="imagen_tarjeta">Imagen</label>
-                                <input
-                                    id="imagen_tarjeta"
-                                    type="file"
-                                    name="imagen_tarjeta"
-                                    accept=".png,.jpg,.jpeg,.webp,.gif"
-                                    required
-                                >
-
-                                <button type="submit" class="boton">
-                                    Agregar tarjeta
-                                </button>
-                            </form>
-                        {% else %}
-                            <p>La categoría ya alcanzó el límite de 50 tarjetas.</p>
-                        {% endif %}
-                    </div>
-                </section>
-
-        {% endif %}
 
     {% endif %}
 
@@ -379,7 +433,12 @@
     defer
 ></script>
 
-{% if modo == "editar" %}
+{% if modo == "crear" %}
+<script
+    src="{{ url_for('static', filename='js/categories/category-create.js') }}"
+    defer
+></script>
+{% elif modo == "editar" %}
 <script
     src="{{ url_for('static', filename='js/categories/category-form.js') }}"
     defer
