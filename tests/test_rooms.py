@@ -3,13 +3,63 @@ from extensions import db
 from models import Categoria, Sala, SalaJugador, Usuario
 
 
-def test_listar_salas_muestra_informacion_y_jugadores(client):
-    # Crear una categoría.
+def preparar_escenario():
+    """
+    Crea una categoria, una sala y tres usuarios
+    para realizar pruebas de gestion de salas.
+    """
+
     categoria = Categoria(nombre="Categoria de prueba")
     db.session.add(categoria)
     db.session.flush()
 
-    # Crear un usuario que será anfitrión.
+    usuarios = []
+
+    for numero in range(1, 4):
+        usuario = Usuario(
+            username=f"jugador{numero}",
+            email=f"jugador{numero}@test.com",
+            password_hash="hash_prueba"
+        )
+
+        db.session.add(usuario)
+        usuarios.append(usuario)
+
+    db.session.flush()
+
+    sala = Sala(
+        nombre="Sala de prueba",
+        anfitrion_id=None,
+        categoria_id=categoria.id,
+        dificultad="facil",
+        estado="disponible"
+    )
+
+    db.session.add(sala)
+    db.session.commit()
+
+    return sala.id, [usuario.id for usuario in usuarios]
+
+
+def autenticar(client, usuario_id):
+    """
+    Simula una sesion de usuario autenticado.
+    """
+
+    with client.session_transaction() as sesion:
+        sesion["usuario_id"] = usuario_id
+
+
+# -------------------------------------------------------------------
+# Prueba 1: Listado de salas
+# -------------------------------------------------------------------
+
+def test_listar_salas_muestra_informacion_y_jugadores(client):
+
+    categoria = Categoria(nombre="Categoria de prueba")
+    db.session.add(categoria)
+    db.session.flush()
+
     anfitrion = Usuario(
         username="jugador1",
         email="jugador1@test.com",
@@ -18,7 +68,6 @@ def test_listar_salas_muestra_informacion_y_jugadores(client):
     db.session.add(anfitrion)
     db.session.flush()
 
-    # Crear una sala en estado esperando.
     sala = Sala(
         nombre="Sala de prueba",
         anfitrion_id=anfitrion.id,
@@ -26,19 +75,18 @@ def test_listar_salas_muestra_informacion_y_jugadores(client):
         dificultad="facil",
         estado="esperando"
     )
+
     db.session.add(sala)
     db.session.flush()
 
-    # Registrar al primer jugador.
     jugador = SalaJugador(
         sala_id=sala.id,
         usuario_id=anfitrion.id
     )
-    db.session.add(jugador)
 
+    db.session.add(jugador)
     db.session.commit()
 
-    # Consultar el listado.
     response = client.get("/salas")
 
     assert response.status_code == 200
@@ -47,3 +95,198 @@ def test_listar_salas_muestra_informacion_y_jugadores(client):
     assert b"Esperando" in response.data
     assert b"jugador1" in response.data
     assert b"1/2" in response.data
+
+
+# -------------------------------------------------------------------
+# Prueba 2: Entrada de dos jugadores y rechazo del tercero
+# -------------------------------------------------------------------
+
+def test_entrada_dos_jugadores_y_rechazo_de_tercero(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+    segundo_jugador = usuarios[1]
+    tercer_jugador = usuarios[2]
+
+    # Entra el primer jugador.
+    autenticar(client, primer_jugador)
+
+    respuesta1 = client.post(
+        f"/salas/{sala_id}/entrar"
+    )
+
+    assert respuesta1.status_code == 201
+    assert respuesta1.get_json()["anfitrion_id"] == primer_jugador
+    assert respuesta1.get_json()["jugadores"] == 1
+
+    # Entra el segundo jugador.
+    autenticar(client, segundo_jugador)
+
+    respuesta2 = client.post(
+        f"/salas/{sala_id}/entrar"
+    )
+
+    assert respuesta2.status_code == 201
+    assert respuesta2.get_json()["anfitrion_id"] == primer_jugador
+    assert respuesta2.get_json()["jugadores"] == 2
+
+    # El tercer jugador intenta entrar.
+    autenticar(client, tercer_jugador)
+
+    respuesta3 = client.post(
+        f"/salas/{sala_id}/entrar"
+    )
+
+    assert respuesta3.status_code == 409
+
+    # Comprobar el estado final de la sala.
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.anfitrion_id == primer_jugador
+    assert sala.estado == "esperando"
+
+    assert SalaJugador.query.filter_by(
+        sala_id=sala_id
+    ).count() == 2
+
+
+# -------------------------------------------------------------------
+# Prueba 3: Transferencia voluntaria del anfitrion
+# -------------------------------------------------------------------
+
+def test_anfitrion_puede_transferir_su_rol(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+    segundo_jugador = usuarios[1]
+
+    # Entran ambos jugadores.
+    autenticar(client, primer_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    autenticar(client, segundo_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    # El anfitrion transfiere su rol.
+    autenticar(client, primer_jugador)
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/transferir-anfitrion",
+        json={
+            "nuevo_anfitrion_id": segundo_jugador
+        }
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json()["anfitrion_id"] == segundo_jugador
+
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.anfitrion_id == segundo_jugador
+
+
+# -------------------------------------------------------------------
+# Prueba 4: Un participante no puede transferir el anfitrion
+# -------------------------------------------------------------------
+
+def test_participante_no_puede_transferir_el_anfitrion(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+    segundo_jugador = usuarios[1]
+
+    autenticar(client, primer_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    autenticar(client, segundo_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    # El segundo jugador intenta transferir el rol.
+    respuesta = client.post(
+        f"/salas/{sala_id}/transferir-anfitrion",
+        json={
+            "nuevo_anfitrion_id": primer_jugador
+        }
+    )
+
+    assert respuesta.status_code == 403
+
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.anfitrion_id == primer_jugador
+
+
+# -------------------------------------------------------------------
+# Prueba 5: Salida del anfitrion y transferencia automatica
+# -------------------------------------------------------------------
+
+def test_salida_del_anfitrion_transfiere_el_rol(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+    segundo_jugador = usuarios[1]
+
+    # Entran ambos jugadores.
+    autenticar(client, primer_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    autenticar(client, segundo_jugador)
+    client.post(f"/salas/{sala_id}/entrar")
+
+    # El anfitrion abandona la sala.
+    autenticar(client, primer_jugador)
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/salir"
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json()["anfitrion_id"] == segundo_jugador
+    assert respuesta.get_json()["jugadores"] == 1
+    assert respuesta.get_json()["estado"] == "esperando"
+
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.anfitrion_id == segundo_jugador
+    assert sala.estado == "esperando"
+
+    assert SalaJugador.query.filter_by(
+        sala_id=sala_id
+    ).count() == 1
+
+
+# -------------------------------------------------------------------
+# Prueba 6: Salida del ultimo jugador
+# -------------------------------------------------------------------
+
+def test_salida_del_ultimo_jugador_libera_la_sala(client):
+
+    sala_id, usuarios = preparar_escenario()
+
+    primer_jugador = usuarios[0]
+
+    autenticar(client, primer_jugador)
+
+    client.post(f"/salas/{sala_id}/entrar")
+
+    respuesta = client.post(
+        f"/salas/{sala_id}/salir"
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json()["anfitrion_id"] is None
+    assert respuesta.get_json()["jugadores"] == 0
+    assert respuesta.get_json()["estado"] == "disponible"
+
+    sala = db.session.get(Sala, sala_id)
+
+    assert sala.anfitrion_id is None
+    assert sala.estado == "disponible"
+
+    assert SalaJugador.query.filter_by(
+        sala_id=sala_id
+    ).count() == 0
