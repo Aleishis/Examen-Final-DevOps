@@ -18,6 +18,7 @@ from werkzeug.utils import secure_filename
 
 from extensions import db
 from models import Categoria, ParejaCarta
+from game_rules import obtener_dificultades
 
 
 categories_bp = Blueprint(
@@ -426,9 +427,15 @@ def create():
     try:
         # Crear la categoría dentro de la transacción.
         # Se activa únicamente si hay al menos 9 tarjetas.
+        activa = request.form.get("activa") == "on"
+
+        # No permitir activar categorías sin suficientes tarjetas.
+        if len(files) < 9:
+            activa = False
+
         category = Categoria(
             nombre=name,
-            activa=len(files) >= 9,
+            activa=activa,
         )
 
         db.session.add(category)
@@ -538,6 +545,34 @@ def edit(categoria_id):
                     category, "El nombre no puede superar los 100 caracteres."
                 ), 400
 
+            # Validar la portada seleccionada, si se envió el campo
+            if "portada_id" in request.form:
+                raw_cover_id = request.form.get("portada_id", "").strip()
+
+                if raw_cover_id == "":
+                    # Se solicitó quitar la portada
+                    category.portada_id = None
+                else:
+                    try:
+                        cover_id = int(raw_cover_id)
+                    except (ValueError, TypeError):
+                        return render_edit_page(
+                            category, "La portada seleccionada no es válida."
+                        ), 400
+
+                    pair = ParejaCarta.query.filter_by(
+                        id=cover_id,
+                        categoria_id=category.id,
+                    ).first()
+
+                    if not pair:
+                        return render_edit_page(
+                            category,
+                            "La tarjeta seleccionada no existe en esta categoría.",
+                        ), 404
+
+                    category.portada_id = pair.id
+
             category.nombre = name
             category.activa = active
 
@@ -548,6 +583,7 @@ def edit(categoria_id):
                 return render_edit_page(
                     category, "Ya existe una categoría con ese nombre."
                 ), 400
+
 
 
 
@@ -871,9 +907,9 @@ def render_edit_page(category, error=None):
         portada=cover,
         cantidad_parejas=count,
         dificultades={
-            "facil": count >= 9,
-            "media": count >= 15,
-            "dificil": count >= 25,
+            "facil": "facil" in obtener_dificultades(count),
+            "media": "media" in obtener_dificultades(count),
+            "dificil": "dificil" in obtener_dificultades(count),
         },
         error=error,
     )

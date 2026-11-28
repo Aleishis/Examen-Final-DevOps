@@ -4,21 +4,35 @@ document.addEventListener("DOMContentLoaded", () => {
     const inputImagenes = document.getElementById("imagenes-tarjetas");
     const rejilla = document.getElementById("rejilla-tarjetas-nuevas");
     const contador = document.getElementById("contador-tarjetas-nuevas");
+    const contadorResumen = document.getElementById("resumen-contador-tarjetas");
     const mensaje = document.getElementById("mensaje-tarjetas-nuevas");
     const metadata = document.getElementById("tarjetas-metadata");
+    const inputActiva = document.getElementById("activa");
+    const estadoActual = document.getElementById("estado-actual");
+
+    const dificultades = {
+        facil: document.getElementById("dificultad-facil"),
+        media: document.getElementById("dificultad-media"),
+        dificil: document.getElementById("dificultad-dificil")
+    };
 
     if (
         !form ||
         !inputImagenes ||
         !rejilla ||
         !contador ||
+        !contadorResumen ||
         !mensaje ||
-        !metadata
+        !metadata ||
+        !inputActiva ||
+        !estadoActual
     ) {
         return;
     }
 
     const MAX_TARJETAS = 50;
+    const TARJETAS_POR_DIFICULTAD = 9;
+
     let tarjetas = [];
     let portadaIndex = null;
 
@@ -29,10 +43,50 @@ document.addEventListener("DOMContentLoaded", () => {
         return (punto > 0 ? nombre.slice(0, punto) : nombre).trim();
     }
 
+
+    function actualizarEstadoYDificultades() {
+        const cantidad = tarjetas.length;
+        const puedeActivarse = cantidad >= 9;
+
+        // No permitir activar la categoría si tiene menos de 9 tarjetas.
+        inputActiva.disabled = !puedeActivarse;
+
+        if (!puedeActivarse) {
+            inputActiva.checked = false;
+        }
+
+        const activa = inputActiva.checked;
+
+        estadoActual.textContent = activa ? "Activa" : "Inactiva";
+        estadoActual.classList.toggle("activa", activa);
+        estadoActual.classList.toggle("inactiva", !activa);
+
+        dificultades.facil?.classList.toggle("bloqueada", cantidad < 9);
+        dificultades.media?.classList.toggle("bloqueada", cantidad < 15);
+        dificultades.dificil?.classList.toggle("bloqueada", cantidad < 25);
+    }
+
+
+    inputActiva.addEventListener("change", () => {
+        actualizarEstadoYDificultades();
+    });
+
+
+
+    function actualizarMetadata() {
+        metadata.value = JSON.stringify({
+            tarjetas: tarjetas.map(tarjeta => ({
+                nombre: tarjeta.nombre.trim()
+            })),
+            portada_index: portadaIndex
+        });
+    }
+
     function renderizarTarjetas() {
         tarjetas.forEach(tarjeta => {
             if (tarjeta.previewUrl) {
                 URL.revokeObjectURL(tarjeta.previewUrl);
+                tarjeta.previewUrl = null;
             }
         });
 
@@ -40,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         tarjetas.forEach((tarjeta, index) => {
             const article = document.createElement("article");
-            article.className = "pareja-tarjeta";
+            article.className = "pareja-tarjeta tarjeta-nueva";
 
             const imagen = document.createElement("img");
             imagen.className = "pareja-imagen";
@@ -73,28 +127,30 @@ document.addEventListener("DOMContentLoaded", () => {
             const acciones = document.createElement("div");
             acciones.className = "acciones-pareja";
 
-            const botonPortada = document.createElement("button");
-            botonPortada.type = "button";
-            botonPortada.className = "boton";
+            const selectorPortada = document.createElement("label");
+            selectorPortada.className = "selector-portada";
+            selectorPortada.title = "Seleccionar portada";
 
-            function actualizarBotonPortada() {
-                const esPortada = portadaIndex === index;
-                botonPortada.textContent = esPortada
-                    ? "★ Portada seleccionada"
-                    : "☆ Designar portada";
+            const inputPortada = document.createElement("input");
+            inputPortada.type = "radio";
+            inputPortada.name = "portada_visual";
+            inputPortada.value = String(index);
+            inputPortada.checked = portadaIndex === index;
+            inputPortada.setAttribute(
+                "aria-label",
+                `Designar ${tarjeta.nombre || `tarjeta ${index + 1}`} como portada`
+            );
 
-                botonPortada.setAttribute(
-                    "aria-pressed",
-                    String(esPortada)
-                );
-            }
+            const textoPortada = document.createElement("span");
+            textoPortada.textContent =
+                portadaIndex === index ? "♛ Portada" : "♛ Designar portada";
 
-            botonPortada.addEventListener("click", () => {
+            inputPortada.addEventListener("change", () => {
                 portadaIndex = index;
                 renderizarTarjetas();
             });
 
-            actualizarBotonPortada();
+            selectorPortada.append(inputPortada, textoPortada);
 
             const botonEliminar = document.createElement("button");
             botonEliminar.type = "button";
@@ -102,6 +158,12 @@ document.addEventListener("DOMContentLoaded", () => {
             botonEliminar.textContent = "Quitar tarjeta";
 
             botonEliminar.addEventListener("click", () => {
+                const tarjetaEliminada = tarjetas[index];
+
+                if (tarjetaEliminada.previewUrl) {
+                    URL.revokeObjectURL(tarjetaEliminada.previewUrl);
+                }
+
                 tarjetas.splice(index, 1);
 
                 if (portadaIndex === index) {
@@ -113,27 +175,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 renderizarTarjetas();
             });
 
-            acciones.append(botonPortada, botonEliminar);
+            acciones.append(selectorPortada, botonEliminar);
             article.append(imagen, formularioNombre, acciones);
             rejilla.appendChild(article);
         });
 
         contador.textContent = tarjetas.length;
+        contadorResumen.textContent = tarjetas.length;
 
         mensaje.textContent = tarjetas.length
             ? `Tienes ${tarjetas.length} tarjeta(s) preparadas.`
             : "Todavía no has seleccionado imágenes.";
 
+        actualizarEstadoYDificultades();
         actualizarMetadata();
-    }
-
-    function actualizarMetadata() {
-        metadata.value = JSON.stringify({
-            tarjetas: tarjetas.map(tarjeta => ({
-                nombre: tarjeta.nombre
-            })),
-            portada_index: portadaIndex
-        });
     }
 
     inputImagenes.addEventListener("change", () => {
@@ -153,16 +208,26 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Permite volver a seleccionar un mismo archivo si se desea.
         inputImagenes.value = "";
         renderizarTarjetas();
     });
 
     form.addEventListener("submit", event => {
+        const nombreCategoria = document
+            .getElementById("nombre")
+            .value.trim();
+
         const nombresValidos = tarjetas.every(tarjeta => {
             const nombre = tarjeta.nombre.trim();
             return nombre.length > 0 && nombre.length <= 100;
         });
+
+        if (!nombreCategoria || nombreCategoria.length > 100) {
+            event.preventDefault();
+            mensaje.textContent =
+                "Escribe un nombre de categoría de hasta 100 caracteres.";
+            return;
+        }
 
         if (tarjetas.length > MAX_TARJETAS || !nombresValidos) {
             event.preventDefault();
@@ -179,6 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         inputImagenes.files = dataTransfer.files;
+
         metadata.value = JSON.stringify({
             tarjetas: tarjetas.map(tarjeta => ({
                 nombre: tarjeta.nombre.trim()

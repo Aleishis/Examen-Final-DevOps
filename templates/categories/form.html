@@ -41,20 +41,57 @@
         ← Volver a categorías
     </a>
 
-    <div class="encabezado">
-        <div>
-            {% if modo == "crear" %}
-                <h1>Nueva categoría</h1>
-                <p>Crea una categoría para tu memorama.</p>
-            {% elif modo == "editar" %}
-                <h1>Editar categoría</h1>
-                <p class="texto-informacion">Modifica los datos y administra sus tarjetas.</p>
-            {% else %}
-                <h1>Detalles de la categoría</h1>
-                <p class="texto-informacion">Consulta la información y las tarjetas registradas.</p>
-            {% endif %}
-        </div>
+
+<div class="encabezado">
+    <div>
+        {% if modo == "crear" %}
+            <h1>Nueva categoría</h1>
+            <p class="texto-informacion">Crea una categoría para tu memorama.                         
+                Se activará automáticamente cuando
+                tenga al menos una dificultad disponible.</p>
+        {% elif modo == "editar" %}
+            <h1>Editar categoría</h1>
+            <p class="texto-informacion">
+                Modifica los datos y administra sus tarjetas.
+            </p>
+        {% else %}
+            <h1>Detalles de la categoría</h1>
+            <p class="texto-informacion">
+                Consulta la información y las tarjetas registradas.
+            </p>
+        {% endif %}
     </div>
+
+    {% if modo == "ver" %}
+        <a
+            class="boton boton-editar-categoria"
+            href="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+        >
+            <span aria-hidden="true">✏️</span>
+            Editar categoría
+        </a>
+    {% elif modo == "editar" %}
+        <div class="acciones-categoria">
+            <button
+                type="submit"
+                form="form-detalles-categoria"
+                class="boton boton-guardar-cambios"
+            >
+                <span aria-hidden="true">💾</span>
+                Guardar cambios
+            </button>
+
+            <a
+                class="boton boton-salir-edicion"
+                href="{{ url_for('categories.form', categoria_id=categoria.id) }}"
+            >
+                <span aria-hidden="true">↩</span>
+                Salir de modo edición
+            </a>
+        </div>
+    {% endif %}
+</div>
+
 
     {% if error %}
         <div class="mensajes" role="alert">
@@ -67,91 +104,116 @@
  
     {% if modo == "crear" %}
 
-        <form
-            id="form-crear-categoria"
-            method="POST"
-            enctype="multipart/form-data"
-            action="{{ url_for('categories.create') }}"
-        >
-            <section class="detalle-resumen">
-                <div class="detalle-info">
-                    <h2>Información de la categoría</h2>
+    <form id="form-crear-categoria" method="POST"
+        enctype="multipart/form-data"
+        action="{{ url_for('categories.create') }}">
 
+        <section class="detalle-resumen">
+            <div class="detalle-info">
+                <h2>Información de la categoría</h2>
+
+                <div class="campo-nombre-categoria">
                     <label for="nombre">Nombre de la categoría</label>
-                    <input
-                        id="nombre"
-                        type="text"
-                        name="nombre"
-                        maxlength="100"
-                        required
-                    >
-
-                    <p class="texto-informacion">
-                        La categoría se activará automáticamente cuando
-                        tenga al menos una dificultad disponible.
-                    </p>
+                    <input id="nombre" type="text" name="nombre"
+                        maxlength="100" required>
                 </div>
-            </section>
 
-            <section class="detalle-resumen">
-                <div class="detalle-info">
-                    <h2>Agregar tarjetas</h2>
-                    <p class="texto-informacion">
-                        Selecciona varias imágenes. Podrás cambiar sus
-                        nombres, elegir la portada y quitar tarjetas
-                        antes de crear la categoría.
-                    </p>
-
-                    <label for="imagenes-tarjetas">
-                        Imágenes de las tarjetas
-                    </label>
-
-                    <input
-                        id="imagenes-tarjetas"
-                        type="file"
-                        name="imagenes_tarjetas"
-                        accept=".png,.jpg,.jpeg,.webp,.gif"
-                        multiple
-                    >
-
-                    <p class="texto-informacion">
-                        Máximo 50 tarjetas por categoría.
-                    </p>
-                </div>
-            </section>
-
-            <section class="detalle-resumen">
-                <div class="detalle-info">
-                    <h2>Vista previa de las tarjetas</h2>
-
+                <div class="opcion-activa">
                     <p>
-                        Tarjetas seleccionadas:
-                        <strong id="contador-tarjetas-nuevas">0</strong>
-                        / 50
+                        <strong>Estado:</strong>
+                        <span id="estado-actual"
+                            class="estado-detalle inactiva">
+                            Inactiva
+                        </span>
                     </p>
 
-                    <div
-                        id="rejilla-tarjetas-nuevas"
-                        class="parejas-rejilla"
-                    ></div>
-
-                    <p id="mensaje-tarjetas-nuevas" aria-live="polite">
-                        Todavía no has seleccionado imágenes.
-                    </p>
+                    <label class="switch">
+                        <input id="activa" type="checkbox"
+                        name="activa"
+                        aria-label="Estado de la categoría">
+                        <span class="switch-deslizador"></span>
+                    </label>
                 </div>
-            </section>
 
-            <input
-                type="hidden"
-                id="tarjetas-metadata"
-                name="tarjetas_metadata"
-                value="[]"
-            >
+                <p class="texto-informacion">
+                    La categoría se activará automáticamente cuando tenga
+                    al menos 9 tarjetas. El estado se actualizará al agregar
+                    o quitar imágenes.
+                </p>
 
-            <button type="submit" class="boton">
+                <p>
+                    <strong>Tarjetas registradas:</strong>
+                    <span id="contador-tarjetas-nuevas">0</span> / 50
+                </p>
+
+                <h3>Dificultades disponibles</h3>
+                <div class="dificultades">
+                    <span id="dificultad-facil"
+                        class="dificultad dificultad-facil bloqueada">
+                        Fácil
+                    </span>
+                    <span id="dificultad-media"
+                        class="dificultad dificultad-media bloqueada">
+                        Medio
+                    </span>
+                    <span id="dificultad-dificil"
+                        class="dificultad dificultad-dificil bloqueada">
+                        Difícil
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <section class="detalle-resumen">
+            <div class="detalle-info">
+                <h2>Agregar tarjetas</h2>
+
+                <p class="texto-informacion">
+                    Selecciona las imágenes que formarán parte de la categoría.
+                    Puedes cambiar sus nombres, quitar tarjetas y elegir una
+                    portada antes de crearla.
+                </p>
+
+                <label for="imagenes-tarjetas">
+                    Imágenes de las tarjetas
+                </label>
+                <input id="imagenes-tarjetas"
+                    type="file"
+                    name="imagenes_tarjetas"
+                    accept=".png,.jpg,.jpeg,.webp,.gif"
+                    multiple>
+            </div>
+        </section>
+
+        <section class="detalle-resumen">
+            <div class="detalle-info">
+                <h2>Tarjetas de la categoría</h2>
+
+                <p>
+                    Tarjetas seleccionadas:
+                    <strong id="resumen-contador-tarjetas">0</strong> / 50
+                </p>
+
+                <div id="rejilla-tarjetas-nuevas"
+                    class="parejas-rejilla"></div>
+
+                <p id="mensaje-tarjetas-nuevas" aria-live="polite">
+                    Todavía no has seleccionado imágenes.
+                </p>
+            </div>
+        </section>
+
+        <input type="hidden" id="tarjetas-metadata"
+            name="tarjetas_metadata" value="[]">
+
+        <div class="acciones-categoria">
+            <button type="submit"
+                    class="boton boton-guardar-cambios">
+                <span aria-hidden="true">💾</span>
                 Crear categoría
             </button>
-        </form>
+        </div>
+    </form>
 
     {% else %}
 
@@ -173,76 +235,54 @@
  
             <div class="detalle-info">
 
-                <div class="cabecera-categoria">
-                    {% if modo == "editar" %}
-                        <h2>Editar categoría</h2>
-                    {% else %}
+                {% if modo != "editar" %}
+                    <div class="cabecera-categoria">
                         <h1>{{ categoria.nombre }}</h1>
-                    {% endif %}
-
-                    <div class="acciones-categoria">
-
-                    {% if modo == "ver" %}
-                        <a
-                            class="boton boton-editar-categoria"
-                            href="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
-                        >
-                            <span aria-hidden="true">✏️</span>
-                            Editar categoría
-                        </a>
-                    {% else %}
-                        <button
-                            type="submit"
-                            form="form-detalles-categoria"
-                            class="boton boton-guardar-cambios"
-                        >
-                            <span aria-hidden="true">💾</span>
-                            Guardar cambios
-                        </button>
-
-                        <a
-                            class="boton boton-salir-edicion"
-                            href="{{ url_for('categories.form', categoria_id=categoria.id) }}"
-                        >
-                            <span aria-hidden="true">↩</span>
-                            Salir de modo edición
-                        </a>
-                    {% endif %}
                     </div>
-                    </div>
+                {% endif %}
 
                 {% if modo == "editar" %}
-                        <form
-                            id="form-detalles-categoria"
-                            method="POST"
-                            action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
-                        >
+                    <form
+                        id="form-detalles-categoria"
+                        method="POST"
+                        action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                    >
                         <input type="hidden" name="action" value="save_details">
 
-                        <label for="nombre">Nombre de la categoría</label>
-                        <input
-                            id="nombre"
-                            type="text"
-                            name="nombre"
-                            value="{{ categoria.nombre }}"
-                            maxlength="100"
-                            required
-                        >
+                        <div class="campo-nombre-categoria">
+                            <label for="nombre">Nombre de la categoría</label>
+                            <input
+                                id="nombre"
+                                type="text"
+                                name="nombre"
+                                value="{{ categoria.nombre }}"
+                                maxlength="100"
+                                required
+                            >
+                        </div>
 
                         <div class="opcion-activa">
-                            <span id="etiqueta-activa">Categoría activa</span>
+                            <p>
+                                <strong>Estado:</strong>
+                                <span
+                                    id="estado-actual"
+                                    class="estado-detalle {{ 'activa' if categoria.activa else 'inactiva' }}"
+                                >
+                                    {{ 'Activa' if categoria.activa else 'Inactiva' }}
+                                </span>
+                            </p>
 
                             <label class="switch">
                                 <input
+                                    id="activa"
                                     type="checkbox"
                                     name="activa"
-                                    aria-labelledby="etiqueta-activa"
+                                    aria-label="Cambiar estado de la categoría"
                                     {% if categoria.activa %}checked{% endif %}
                                 >
                                 <span class="switch-deslizador"></span>
                             </label>
                         </div>
-
                     </form>
                 {% else %}
                     <p>
@@ -424,19 +464,19 @@
                                                 </button>
                                             </form>
 
-                                            <form method="POST"
-                                                action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
-                                                class="formulario-portada">
-                                                <input type="hidden" name="action" value="set_cover">
-                                                <input type="hidden" name="pareja_id" value="{{ pareja.id }}">
 
-                                                <label class="selector-portada" title="Designar como portada">
-                                                    <input type="checkbox" name="portada"
+                                            <div class="formulario-portada">
+                                                <label class="selector-portada" title="Seleccionar portada">
+                                                    <input
+                                                        type="radio"
+                                                        name="portada_id"
+                                                        value="{{ pareja.id }}"
+                                                        form="form-detalles-categoria"
                                                         {% if portada and portada.id == pareja.id %}checked{% endif %}
                                                         aria-label="Designar {{ pareja.nombre }} como portada"
-                                                        onchange="this.form.requestSubmit()">
+                                                    >
                                                 </label>
-                                            </form>
+                                            </div>
                                         </div>
 
                                 {% else %}

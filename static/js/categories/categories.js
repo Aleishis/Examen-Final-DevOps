@@ -198,3 +198,25 @@ document.querySelectorAll(".mensajes").forEach(mensajes => {
     }, 4000);
 });
 
+
+document.addEventListener("DOMContentLoaded", () => {
+    const interruptor = document.getElementById("activa");
+    const estado = document.getElementById("estado-actual");
+
+    if (!interruptor || !estado) {
+        return;
+    }
+
+    function actualizarEstado() {
+        const activa = interruptor.checked;
+
+        estado.textContent = activa ? "Activa" : "Inactiva";
+
+        estado.classList.toggle("activa", activa);
+        estado.classList.toggle("inactiva", !activa);
+    }
+
+    interruptor.addEventListener("change", actualizarEstado);
+    actualizarEstado();
+});
+
