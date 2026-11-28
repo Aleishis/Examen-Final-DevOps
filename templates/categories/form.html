@@ -21,6 +21,21 @@
 <body>
 <div class="contenedor">
 
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% if mensajes %}
+            <div class="mensajes" aria-live="polite">
+                {% for tipo, mensaje in mensajes %}
+                    <div
+                        class="mensaje mensaje-{{ tipo }}"
+                        role="status"
+                    >
+                        {{ mensaje }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     <a class="boton boton-volver"
        href="{{ url_for('categories.index') }}">
         ← Volver a categorías
@@ -33,17 +48,19 @@
                 <p>Crea una categoría para tu memorama.</p>
             {% elif modo == "editar" %}
                 <h1>Editar categoría</h1>
-                <p>Modifica los datos y administra sus tarjetas.</p>
+                <p class="texto-informacion">Modifica los datos y administra sus tarjetas.</p>
             {% else %}
                 <h1>Detalles de la categoría</h1>
-                <p>Consulta la información y las tarjetas registradas.</p>
+                <p class="texto-informacion">Consulta la información y las tarjetas registradas.</p>
             {% endif %}
         </div>
     </div>
 
     {% if error %}
-        <div class="mensaje-error" role="alert">
-            {{ error }}
+        <div class="mensajes" role="alert">
+            <div class="mensaje mensaje-error">
+                {{ error }}
+            </div>
         </div>
     {% endif %}
 
@@ -69,7 +86,7 @@
                         required
                     >
 
-                    <p>
+                    <p class="texto-informacion">
                         La categoría se activará automáticamente cuando
                         tenga al menos una dificultad disponible.
                     </p>
@@ -79,7 +96,7 @@
             <section class="detalle-resumen">
                 <div class="detalle-info">
                     <h2>Agregar tarjetas</h2>
-                    <p>
+                    <p class="texto-informacion">
                         Selecciona varias imágenes. Podrás cambiar sus
                         nombres, elegir la portada y quitar tarjetas
                         antes de crear la categoría.
@@ -97,7 +114,7 @@
                         multiple
                     >
 
-                    <p>
+                    <p class="texto-informacion">
                         Máximo 50 tarjetas por categoría.
                     </p>
                 </div>
@@ -153,13 +170,53 @@
                 </div>
             {% endif %}
 
+ 
             <div class="detalle-info">
 
+                <div class="cabecera-categoria">
+                    {% if modo == "editar" %}
+                        <h2>Editar categoría</h2>
+                    {% else %}
+                        <h1>{{ categoria.nombre }}</h1>
+                    {% endif %}
+
+                    <div class="acciones-categoria">
+
+                    {% if modo == "ver" %}
+                        <a
+                            class="boton boton-editar-categoria"
+                            href="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                        >
+                            <span aria-hidden="true">✏️</span>
+                            Editar categoría
+                        </a>
+                    {% else %}
+                        <button
+                            type="submit"
+                            form="form-detalles-categoria"
+                            class="boton boton-guardar-cambios"
+                        >
+                            <span aria-hidden="true">💾</span>
+                            Guardar cambios
+                        </button>
+
+                        <a
+                            class="boton boton-salir-edicion"
+                            href="{{ url_for('categories.form', categoria_id=categoria.id) }}"
+                        >
+                            <span aria-hidden="true">↩</span>
+                            Salir de modo edición
+                        </a>
+                    {% endif %}
+                    </div>
+                    </div>
+
                 {% if modo == "editar" %}
-                    <form
-                        method="POST"
-                        action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
-                    >
+                        <form
+                            id="form-detalles-categoria"
+                            method="POST"
+                            action="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
+                        >
                         <input type="hidden" name="action" value="save_details">
 
                         <label for="nombre">Nombre de la categoría</label>
@@ -172,7 +229,6 @@
                             required
                         >
 
-
                         <div class="opcion-activa">
                             <span id="etiqueta-activa">Categoría activa</span>
 
@@ -181,19 +237,14 @@
                                     type="checkbox"
                                     name="activa"
                                     aria-labelledby="etiqueta-activa"
-                                    {% if categoria.activa %}checked{% endif %}>
+                                    {% if categoria.activa %}checked{% endif %}
+                                >
                                 <span class="switch-deslizador"></span>
                             </label>
                         </div>
 
-
-                        <button type="submit" class="boton">
-                            Guardar cambios
-                        </button>
                     </form>
                 {% else %}
-                    <h1>{{ categoria.nombre }}</h1>
-
                     <p>
                         <strong>Estado:</strong>
                         <span class="estado-detalle {{ 'activa' if categoria.activa else 'inactiva' }}">
@@ -201,6 +252,7 @@
                         </span>
                     </p>
                 {% endif %}
+
 
                 <p>
                     <strong>Tarjetas registradas:</strong>
@@ -210,33 +262,15 @@
                 <h3>Dificultades disponibles</h3>
 
                 <div class="dificultades">
-                    <span class="dificultad {{ '' if dificultades.facil else 'bloqueada' }}">
+                    <span class="dificultad dificultad-facil {{ '' if dificultades.facil else 'bloqueada' }}">
                         Fácil
                     </span>
-                    <span class="dificultad {{ '' if dificultades.media else 'bloqueada' }}">
+                    <span class="dificultad dificultad-media {{ '' if dificultades.media else 'bloqueada' }}">
                         Medio
                     </span>
-                    <span class="dificultad {{ '' if dificultades.dificil else 'bloqueada' }}">
+                    <span class="dificultad dificultad-dificil {{ '' if dificultades.dificil else 'bloqueada' }}">
                         Difícil
                     </span>
-                </div>
-
-                <div class="detalle-acciones">
-                    {% if modo == "ver" %}
-                        <a
-                            class="boton"
-                            href="{{ url_for('categories.edit', categoria_id=categoria.id) }}"
-                        >
-                            Editar categoría
-                        </a>
-                    {% else %}
-                        <a
-                            class="boton"
-                            href="{{ url_for('categories.form', categoria_id=categoria.id) }}"
-                        >
-                            Salir de modo edición
-                        </a>
-                    {% endif %}
                 </div>
 
             </div>
@@ -249,11 +283,10 @@
        
             <section>
 
-                                            {% if modo == "editar" %}
+            {% if modo == "editar" %}
                 <section class="detalle-resumen">
                     <div class="detalle-info">
                         <h2>Agregar tarjeta</h2>
-                        <p>Selecciona una imagen y escribe el nombre de la tarjeta.</p>
 
                         {% if cantidad_parejas < 50 %}
 
@@ -264,7 +297,6 @@
                             >
                                 <input type="hidden" name="action" value="add_pair">
 
-                                <label for="imagen_tarjeta">Imágenes de las tarjetas</label>
                                 <input
                                     id="imagen_tarjeta"
                                     type="file"
@@ -289,14 +321,13 @@
 
                 <h2>Tarjetas de la categoría</h2>
 
-                <p>
-                    {% if modo == "editar" %}
-                        Puedes agregar tarjetas nuevas o eliminar las existentes.
-                        Las imágenes no se reemplazan.
-                    {% else %}
-                        Estas son las {{ cantidad_parejas }} tarjetas registradas.
-                    {% endif %}
+            {% if modo == "editar" %}
+                <p class="texto-informacion">
+                    Puedes agregar tarjetas nuevas o eliminar las existentes.
+                    Las imágenes no se reemplazan.
                 </p>
+            {% endif %}
+                
 
 
 

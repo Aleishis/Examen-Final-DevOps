@@ -502,6 +502,8 @@ def create():
         )
 
     # Abrir la categoría creada para revisar o editar sus tarjetas.
+    flash("Categoría creada correctamente.", "success")
+
     return redirect(
         url_for("categories.edit", categoria_id=category.id)
     )
@@ -836,6 +838,8 @@ def edit(categoria_id):
             return render_edit_page(
                 category, "La operación solicitada no es válida."
             ), 400
+
+        flash("Tarea realizada con exito.", "success")
 
         return redirect(
             url_for("categories.edit", categoria_id=category.id)

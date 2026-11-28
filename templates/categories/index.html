@@ -13,10 +13,22 @@
 <body>
 <div class="contenedor">
 
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% if mensajes %}
+            <div class="mensajes">
+                {% for tipo, mensaje in mensajes %}
+                    <div class="mensaje mensaje-{{ tipo }}">
+                        {{ mensaje }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     <div class="encabezado">
         <div>
             <h1>Categorías</h1>
-            <p>Administra las categorías y sus parejas de cartas.</p>
+            <p class="texto-informacion">Administra las categorías y sus parejas de cartas.</p>
         </div>
 
         <a
@@ -94,7 +106,7 @@
     action="{{ url_for('categories.delete_selected') }}"
 >
     <div class="acciones" style="margin-bottom: 18px;">
-        <span>Selecciona las categorías que quieras eliminar.</span>
+        <span class="texto-informacion">Selecciona las categorías que quieras eliminar.</span>
 
         <button
             class="boton boton-eliminar"
@@ -146,15 +158,15 @@
                         <p>Parejas: {{ categoria.cantidad_parejas }} / 50</p>
 
                         <div class="dificultades">
-                            <span class="dificultad {{ '' if categoria.dificultades.facil else 'bloqueada' }}">
+                            <span class="dificultad dificultad-facil {{ '' if categoria.dificultades.facil else 'bloqueada' }}">
                                 Fácil
                             </span>
 
-                            <span class="dificultad {{ '' if categoria.dificultades.media else 'bloqueada' }}">
+                            <span class="dificultad dificultad-media {{ '' if categoria.dificultades.media else 'bloqueada' }}">
                                 Medio
                             </span>
 
-                            <span class="dificultad {{ '' if categoria.dificultades.dificil else 'bloqueada' }}">
+                            <span class="dificultad dificultad-dificil {{ '' if categoria.dificultades.dificil else 'bloqueada' }}">
                                 Difícil
                             </span>
                         </div>
@@ -172,16 +184,6 @@
 </form>
 
 </div>
-
-{% with mensajes = get_flashed_messages() %}
-    {% if mensajes %}
-        <div class="mensajes">
-            {% for mensaje in mensajes %}
-                <p>{{ mensaje }}</p>
-            {% endfor %}
-        </div>
-    {% endif %}
-{% endwith %}
 
 <script src="{{ url_for('static', filename='js/categories/categories.js') }}" defer></script>
 </body>

@@ -182,3 +182,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 });
+
+
+/* ==========================================
+   Ocultar notificaciones automáticamente
+========================================== */
+
+document.querySelectorAll(".mensajes").forEach(mensajes => {
+    setTimeout(() => {
+        mensajes.classList.add("ocultando");
+
+        setTimeout(() => {
+            mensajes.remove();
+        }, 400);
+    }, 4000);
+});
+
